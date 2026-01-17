@@ -280,14 +280,6 @@ export interface RetryOptions {
 	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
 }
 
-/** Default retryable error codes */
-export const DEFAULT_RETRYABLE_CODES: readonly AdapterErrorCode[] = [
-	'RATE_LIMIT_ERROR',
-	'NETWORK_ERROR',
-	'TIMEOUT_ERROR',
-	'SERVICE_ERROR',
-]
-
 /** Retry wrapper for provider adapters */
 export interface RetryableProviderAdapterOptions {
 	/** Base provider adapter to wrap */
@@ -314,6 +306,8 @@ export interface RetryableEmbeddingAdapterOptions {
  * Token counting logic is owned by `@mikesaintsg/inference`.
  * This package provides model-specific multipliers as constants
  * that can be passed to inference's token counter for improved accuracy.
+ *
+ * @see DEFAULT_MODEL_MULTIPLIERS in constants.ts
  */
 export interface ModelTokenMultipliers {
 	/** OpenAI models typically use ~4 chars/token */
@@ -331,20 +325,6 @@ export interface ModelTokenMultipliers {
 	readonly 'mistral': number
 	/** Index signature for other models */
 	readonly [model: string]: number
-}
-
-/** Default model multipliers (chars per token) */
-export const DEFAULT_MODEL_MULTIPLIERS: Partial<ModelTokenMultipliers> = {
-	'gpt-4': 4,
-	'gpt-4o': 4,
-	'gpt-3.5-turbo': 4,
-	'claude-3-5-sonnet-20241022': 3.5,
-	'claude-3-opus-20240229': 3.5,
-	'claude-3-sonnet-20240229': 3.5,
-	'claude-3-haiku-20240307': 3.5,
-	'llama2': 4,
-	'llama3': 4,
-	'mistral': 4,
 }
 
 /** Batched embedding adapter options */
@@ -735,6 +715,55 @@ export interface AnthropicDelta {
 	readonly type: string
 	readonly text?: string
 	readonly partial_json?: string
+}
+
+// ============================================================================
+// OpenAI Embedding API Response Types
+// ============================================================================
+
+/** OpenAI embedding response */
+export interface OpenAIEmbeddingResponse {
+	readonly object: 'list'
+	readonly data: readonly OpenAIEmbeddingData[]
+	readonly model: string
+	readonly usage: OpenAIEmbeddingUsage
+}
+
+/** OpenAI embedding data item */
+export interface OpenAIEmbeddingData {
+	readonly object: 'embedding'
+	readonly index: number
+	readonly embedding: readonly number[]
+}
+
+/** OpenAI embedding usage */
+export interface OpenAIEmbeddingUsage {
+	readonly prompt_tokens: number
+	readonly total_tokens: number
+}
+
+// ============================================================================
+// Voyage AI Embedding API Response Types
+// ============================================================================
+
+/** Voyage AI embedding response */
+export interface VoyageEmbeddingResponse {
+	readonly object: 'list'
+	readonly data: readonly VoyageEmbeddingData[]
+	readonly model: string
+	readonly usage: VoyageEmbeddingUsage
+}
+
+/** Voyage AI embedding data item */
+export interface VoyageEmbeddingData {
+	readonly object: 'embedding'
+	readonly index: number
+	readonly embedding: readonly number[]
+}
+
+/** Voyage AI embedding usage */
+export interface VoyageEmbeddingUsage {
+	readonly total_tokens: number
 }
 
 // ============================================================================

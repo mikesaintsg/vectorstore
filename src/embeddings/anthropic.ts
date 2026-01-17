@@ -12,12 +12,13 @@ import {
 	VOYAGE_DEFAULT_EMBEDDING_DIMENSIONS,
 	VOYAGE_API_BASE_URL,
 } from '../constants.js'
-import {
+import type {
 	AbortableOptions,
-	AnthropicEmbeddingAdapterOptions, Embedding,
+	Embedding,
 	EmbeddingAdapterInterface,
-	EmbeddingModelMetadata, VoyageEmbeddingResponse
-} from "@mikesaintsg/core";
+	EmbeddingModelMetadata,
+} from '@mikesaintsg/core'
+import type { VoyageEmbeddingAdapterOptions, VoyageEmbeddingResponse } from '../types.js'
 
 /**
  * Create an Anthropic-compatible embedding adapter.
@@ -39,7 +40,7 @@ import {
  * ```
  */
 export function createAnthropicEmbeddingAdapter(
-	options: AnthropicEmbeddingAdapterOptions,
+	options: VoyageEmbeddingAdapterOptions,
 ): EmbeddingAdapterInterface {
 	const {
 		apiKey,

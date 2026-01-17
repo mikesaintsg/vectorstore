@@ -5,13 +5,33 @@
  * Converts between internal tool representations and OpenAI's format.
  */
 
-import {
-	OpenAITool,
-	OpenAIToolCall,
-	OpenAIToolFormatAdapterOptions, ToolCall,
-	ToolFormatAdapterInterface, ToolResult,
-	ToolSchema
-} from "@mikesaintsg/core";
+import type {
+	ToolCall,
+	ToolFormatAdapterInterface,
+	ToolResult,
+	ToolSchema,
+} from '@mikesaintsg/core'
+import type { OpenAIToolFormatAdapterOptions } from '../types.js'
+
+/** OpenAI tool definition format */
+interface OpenAITool {
+	readonly type: 'function'
+	readonly function: {
+		readonly name: string
+		readonly description: string
+		readonly parameters: unknown
+	}
+}
+
+/** OpenAI tool call format */
+interface OpenAIToolCall {
+	readonly id: string
+	readonly type: 'function'
+	readonly function: {
+		readonly name: string
+		readonly arguments: string
+	}
+}
 
 /**
  * Create an OpenAI tool format adapter.

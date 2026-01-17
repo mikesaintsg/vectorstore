@@ -5,12 +5,20 @@
  * Converts between internal tool representations and Anthropic's format.
  */
 
-import {
-	AnthropicTool,
-	AnthropicToolFormatAdapterOptions, ToolCall,
-	ToolFormatAdapterInterface, ToolResult,
-	ToolSchema
-} from "@mikesaintsg/core";
+import type {
+	ToolCall,
+	ToolFormatAdapterInterface,
+	ToolResult,
+	ToolSchema,
+} from '@mikesaintsg/core'
+import type { AnthropicToolFormatAdapterOptions } from '../types.js'
+
+/** Anthropic tool definition format */
+interface AnthropicTool {
+	readonly name: string
+	readonly description: string
+	readonly input_schema: unknown
+}
 
 /**
  * Create an Anthropic tool format adapter.

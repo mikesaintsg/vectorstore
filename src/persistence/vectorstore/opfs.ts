@@ -17,8 +17,8 @@ import {
 import {
 	OPFSVectorStorePersistenceOptions,
 	StoredDocument, VectorStoreMetadata,
-	VectorStorePersistenceAdapterInterface
-} from "@mikesaintsg/core";
+	VectorStorePersistenceAdapterInterface,
+} from '@mikesaintsg/core'
 
 /**
  * Create an OPFS persistence adapter for VectorStore.

@@ -15,8 +15,8 @@ import {
 	HTTPPersistenceOptions,
 	StoredDocument,
 	VectorStoreMetadata,
-	VectorStorePersistenceAdapterInterface
-} from "@mikesaintsg/core";
+	VectorStorePersistenceAdapterInterface,
+} from '@mikesaintsg/core'
 
 /**
  * Create an HTTP persistence adapter for VectorStore.

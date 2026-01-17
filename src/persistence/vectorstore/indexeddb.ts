@@ -13,8 +13,8 @@ import {
 import {
 	IndexedDBVectorStorePersistenceOptions,
 	StoredDocument, VectorStoreMetadata,
-	VectorStorePersistenceAdapterInterface
-} from "@mikesaintsg/core";
+	VectorStorePersistenceAdapterInterface,
+} from '@mikesaintsg/core'
 
 /**
  * Create an IndexedDB persistence adapter for VectorStore.

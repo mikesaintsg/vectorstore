@@ -8,7 +8,7 @@
 // Content Hashing Helpers
 // ============================================================================
 
-import {ContentHash, Embedding, StoredDocument} from "@mikesaintsg/core";
+import { ContentHash, Embedding, StoredDocument } from '@mikesaintsg/core'
 
 /**
  * Compute a SHA-256 content hash for text.

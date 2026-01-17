@@ -1,181 +1,104 @@
 /**
  * @mikesaintsg/adapters
  *
- * In-memory embedding cache with LRU eviction and TTL support.
+ * Cached embedding adapter that wraps any embedding adapter with
+ * caching support to avoid redundant API calls.
+ *
+ * TODO: [Phase 3] Full implementation with TTL support
  */
 
-import { estimateEmbeddingBytes } from '../helpers.js'
-import { EMBEDDING_CACHE_DEFAULT_MAX_ENTRIES } from '../constants.js'
-import {
-	ContentHash,
+import { computeContentHash } from '../helpers.js'
+import type {
+	AbortableOptions,
 	Embedding,
-	EmbeddingCacheInterface,
-	EmbeddingCacheOptions,
-	EmbeddingCacheStats,
-	LRUCacheEntry
-} from "@mikesaintsg/core";
+	EmbeddingAdapterInterface,
+	EmbeddingModelMetadata,
+} from '@mikesaintsg/core'
+import type { CachedEmbeddingAdapterOptions, CachedEmbedding } from '../types.js'
 
 /**
- * Create an in-memory embedding cache with LRU eviction.
+ * Create a cached embedding adapter that wraps any embedding adapter.
  *
  * @param options - Cache configuration options
- * @returns An embedding cache instance
+ * @returns An embedding adapter with caching support
  *
  * @example
  * ```ts
- * const cache = createEmbeddingCache({
- *   maxEntries: 1000,
+ * const baseAdapter = createOpenAIEmbeddingAdapter({ apiKey: '...' })
+ *
+ * const cached = createCachedEmbeddingAdapter({
+ *   adapter: baseAdapter,
+ *   cache: new Map(),
  *   ttlMs: 60 * 60 * 1000, // 1 hour
  * })
  *
- * cache.set('hash123', embedding)
- * const cached = cache.get('hash123')
+ * // Subsequent calls for the same text will use cache
+ * const e1 = await cached.embed(['Hello'])
+ * const e2 = await cached.embed(['Hello']) // Uses cache
  * ```
  */
-export function createEmbeddingCache(
-	options: EmbeddingCacheOptions = {},
-): EmbeddingCacheInterface {
+export function createCachedEmbeddingAdapter(
+	options: CachedEmbeddingAdapterOptions,
+): EmbeddingAdapterInterface {
 	const {
-		maxEntries = EMBEDDING_CACHE_DEFAULT_MAX_ENTRIES,
-		maxBytes,
+		adapter,
+		cache,
 		ttlMs,
-		onEvict,
 	} = options
 
-	const cache = new Map<ContentHash, LRUCacheEntry>()
-	let hits = 0
-	let misses = 0
-
-	/** Get total estimated bytes */
-	function getTotalBytes(): number {
-		let total = 0
-		for (const entry of cache.values()) {
-			total += estimateEmbeddingBytes(entry.embedding)
-		}
-		return total
-	}
-
-	/** Check if entry is expired */
-	function isExpired(entry: LRUCacheEntry): boolean {
-		if (ttlMs === undefined) return false
-		return Date.now() - entry.createdAt > ttlMs
-	}
-
-	/** Evict oldest entries until under limits */
-	function evictIfNeeded(): void {
-		// Evict by max entries
-		while (cache.size > maxEntries) {
-			evictLRU()
-		}
-
-		// Evict by max bytes
-		if (maxBytes !== undefined) {
-			while (getTotalBytes() > maxBytes && cache.size > 0) {
-				evictLRU()
-			}
-		}
-	}
-
-	/** Evict least recently used entry */
-	function evictLRU(): void {
-		let oldestKey: ContentHash | undefined
-		let oldestAccess = Infinity
-
-		for (const [key, entry] of cache.entries()) {
-			if (entry.lastAccess < oldestAccess) {
-				oldestAccess = entry.lastAccess
-				oldestKey = key
-			}
-		}
-
-		if (oldestKey !== undefined) {
-			const entry = cache.get(oldestKey)
-			cache.delete(oldestKey)
-			if (entry && onEvict) {
-				onEvict(oldestKey, entry.embedding)
-			}
-		}
+	/**
+	 * Check if a cached entry is still valid based on TTL.
+	 */
+	function isValid(entry: CachedEmbedding): boolean {
+		if (ttlMs === undefined) return true
+		return Date.now() - entry.cachedAt < ttlMs
 	}
 
 	return {
-		get(contentHash: ContentHash): Embedding | undefined {
-			const entry = cache.get(contentHash)
+		async embed(texts: readonly string[], abortOptions?: AbortableOptions): Promise<readonly Embedding[]> {
+			const results: Embedding[] = []
+			const uncachedTexts: string[] = []
+			const uncachedIndices: number[] = []
 
-			if (!entry) {
-				misses++
-				return undefined
-			}
+			// Check cache for each text
+			for (let i = 0; i < texts.length; i++) {
+				const text = texts[i]
+				if (text === undefined) continue
 
-			if (isExpired(entry)) {
-				cache.delete(contentHash)
-				if (onEvict) {
-					onEvict(contentHash, entry.embedding)
-				}
-				misses++
-				return undefined
-			}
+				const hash = await computeContentHash(text)
+				const cached = cache.get(hash)
 
-			entry.hitCount++
-			entry.lastAccess = Date.now()
-			hits++
-			return entry.embedding
-		},
-
-		set(contentHash: ContentHash, embedding: Embedding): void {
-			const now = Date.now()
-
-			cache.set(contentHash, {
-				embedding,
-				createdAt: now,
-				hitCount: 0,
-				lastAccess: now,
-			})
-
-			evictIfNeeded()
-		},
-
-		has(contentHash: ContentHash): boolean {
-			const entry = cache.get(contentHash)
-			if (!entry) return false
-			if (isExpired(entry)) {
-				cache.delete(contentHash)
-				if (onEvict) {
-					onEvict(contentHash, entry.embedding)
-				}
-				return false
-			}
-			return true
-		},
-
-		remove(contentHash: ContentHash): boolean {
-			const entry = cache.get(contentHash)
-			if (entry && onEvict) {
-				onEvict(contentHash, entry.embedding)
-			}
-			return cache.delete(contentHash)
-		},
-
-		clear(): void {
-			if (onEvict) {
-				for (const [key, entry] of cache.entries()) {
-					onEvict(key, entry.embedding)
+				if (cached && isValid(cached)) {
+					results[i] = cached.embedding
+				} else {
+					uncachedTexts.push(text)
+					uncachedIndices.push(i)
 				}
 			}
-			cache.clear()
-			hits = 0
-			misses = 0
+
+			// Fetch uncached embeddings
+			if (uncachedTexts.length > 0) {
+				const embeddings = await adapter.embed(uncachedTexts, abortOptions)
+
+				// Store in cache and results
+				for (let j = 0; j < embeddings.length; j++) {
+					const embedding = embeddings[j]
+					const text = uncachedTexts[j]
+					const index = uncachedIndices[j]
+
+					if (embedding !== undefined && text !== undefined && index !== undefined) {
+						const hash = await computeContentHash(text)
+						cache.set(hash, { embedding, cachedAt: Date.now() })
+						results[index] = embedding
+					}
+				}
+			}
+
+			return results
 		},
 
-		getStats(): EmbeddingCacheStats {
-			const entries = cache.size
-			const total = hits + misses
-			return {
-				entries,
-				hits,
-				misses,
-				hitRate: total > 0 ? hits / total : 0,
-				estimatedBytes: getTotalBytes(),
-			}
+		getModelMetadata(): EmbeddingModelMetadata {
+			return adapter.getModelMetadata()
 		},
 	}
 }

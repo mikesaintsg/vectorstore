@@ -10,14 +10,13 @@ import {
 	OPENAI_DEFAULT_EMBEDDING_DIMENSIONS,
 	OPENAI_API_BASE_URL,
 } from '../constants.js'
-import {
+import type {
 	AbortableOptions,
 	Embedding,
 	EmbeddingAdapterInterface,
 	EmbeddingModelMetadata,
-	OpenAIEmbeddingAdapterOptions,
-	OpenAIEmbeddingResponse
-} from "@mikesaintsg/core";
+} from '@mikesaintsg/core'
+import type { OpenAIEmbeddingAdapterOptions, OpenAIEmbeddingResponse } from '../types.js'
 
 /**
  * Create an OpenAI embedding adapter.
