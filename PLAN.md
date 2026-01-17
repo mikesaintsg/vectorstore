@@ -1,8 +1,8 @@
 # Project Plan: @mikesaintsg/adapters
 
-> **Status:** Phase 3 of 5 — Embeddings
+> **Status:** Phase 4 of 5 — Providers
 > **Last Updated:** 2026-01-17
-> **Next Milestone:** Embedding adapters
+> **Next Milestone:** Provider adapters
 
 ---
 
@@ -20,11 +20,11 @@
 ### Current Session State
 
 ```
-Phase: 3 of 5 (Embeddings)
-Active Deliverable: 3.1 OpenAI Embedding Adapter
+Phase: 4 of 5 (Providers)
+Active Deliverable: 4.1 OpenAI Provider Adapter
 Checklist Progress: 0/N items complete
-Last Action: Phase 2 Core Helpers complete (166 tests passing)
-Next Action: Implement embedding adapters
+Last Action: Phase 3 Embeddings complete (222 tests passing)
+Next Action: Implement provider adapters
 ```
 
 > **Instructions:** Update this section at the END of each session with the model.
@@ -158,8 +158,8 @@ How we know the project is complete:
 |---|--------------|-------------|---------------------------------------|-----------------------------|
 | 1 | Foundation   | ✅ Complete | Types, project structure, helpers     | `phases/01-foundation.md`   |
 | 2 | Core Helpers | ✅ Complete | SSE parser, rate limiter, error maps  | `phases/02-core-helpers.md` |
-| 3 | Embeddings   | 🔄 Active   | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
-| 4 | Providers    | ⏳ Pending  | Provider adapters (OpenAI, Anthropic) | `phases/04-providers.md`    |
+| 3 | Embeddings   | ✅ Complete | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
+| 4 | Providers    | 🔄 Active   | Provider adapters (OpenAI, Anthropic) | `phases/04-providers.md`    |
 | 5 | Integration  | ⏳ Pending  | Bridges, persistence, showcase        | `phases/05-integration.md`  |
 
 **Status Legend:**
@@ -306,6 +306,38 @@ How we know the project is complete:
 ## Session Log
 
 > **Purpose:** Track work across multiple sessions. Append new entries at the top.
+
+### 2026-01-17 Session 4
+
+**Started:** Phase 3, Deliverable 3.1 (OpenAI Embedding Adapter)
+**Completed:**
+- Created Voyage embedding adapter in `src/embeddings/voyage.ts`
+  - Supports voyage-3, voyage-3-lite, voyage-code-3 models
+  - Model-specific dimension mapping
+  - Input type support for retrieval optimization
+- Created Ollama embedding adapter in `src/embeddings/ollama.ts`
+  - Uses `/api/embed` endpoint
+  - Timeout support and proper error handling
+- Completed Batched embedding wrapper in `src/embeddings/batched.ts`
+  - Full batching logic with deduplication
+  - Configurable batch size and flush delay
+  - Promise resolution for each caller
+- Reviewed and validated existing adapters (OpenAI, Cache)
+- Created comprehensive tests:
+  - `tests/embeddings/openai.test.ts` (11 tests)
+  - `tests/embeddings/voyage.test.ts` (12 tests)
+  - `tests/embeddings/ollama.test.ts` (10 tests)
+  - `tests/embeddings/batched.test.ts` (11 tests)
+  - `tests/embeddings/cached.test.ts` (12 tests)
+- Updated barrel exports for embeddings
+- All quality gates passing (222 tests)
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 3 ✅ Complete, ready for Phase 4
+
+---
 
 ### 2026-01-17 Session 3
 

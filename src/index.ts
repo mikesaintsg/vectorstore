@@ -20,6 +20,9 @@ export * from './helpers/index.js'
 // Wrapper adapters
 export * from './wrappers/index.js'
 
+// Embedding adapters
+export * from './embeddings/index.js'
+
 // Constants
 export * from './constants.js'
 
