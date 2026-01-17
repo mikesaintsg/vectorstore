@@ -1,8 +1,8 @@
 # Project Plan: @mikesaintsg/adapters
 
-> **Status:** Phase 2 of 5 — Core Helpers
+> **Status:** Phase 5 of 5 — Integration ✅ Complete
 > **Last Updated:** 2026-01-17
-> **Next Milestone:** SSE parser and rate limiter
+> **Next Milestone:** Project Complete
 
 ---
 
@@ -20,11 +20,11 @@
 ### Current Session State
 
 ```
-Phase: 2 of 5 (Core Helpers)
-Active Deliverable: 2.1 SSE Parser
-Checklist Progress: 0/20 items complete
-Last Action: Phase 1 Foundation complete (64 tests passing)
-Next Action: Implement SSE parser for streaming responses
+Phase: 5 of 5 (Integration) ✅ Complete
+Active Deliverable: None - Project Complete
+Checklist Progress: 8/8 deliverables complete
+Last Action: Implemented Showcase Demo and Integration Tests (328 tests passing)
+Next Action: Project Complete - Ready for release
 ```
 
 > **Instructions:** Update this section at the END of each session with the model.
@@ -154,13 +154,13 @@ How we know the project is complete:
 
 ## Phases
 
-| # | Phase        | Status     | Description                           | File                        |
-|---|--------------|------------|---------------------------------------|-----------------------------|
+| # | Phase        | Status      | Description                           | File                        |
+|---|--------------|-------------|---------------------------------------|-----------------------------|
 | 1 | Foundation   | ✅ Complete | Types, project structure, helpers     | `phases/01-foundation.md`   |
-| 2 | Core Helpers | 🔄 Active  | SSE parser, rate limiter, error maps  | `phases/02-core-helpers.md` |
-| 3 | Embeddings   | ⏳ Pending  | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
-| 4 | Providers    | ⏳ Pending  | Provider adapters (OpenAI, Anthropic) | `phases/04-providers.md`    |
-| 5 | Integration  | ⏳ Pending  | Bridges, persistence, showcase        | `phases/05-integration.md`  |
+| 2 | Core Helpers | ✅ Complete | SSE parser, rate limiter, error maps  | `phases/02-core-helpers.md` |
+| 3 | Embeddings   | ✅ Complete | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
+| 4 | Providers    | ✅ Complete | Provider adapters (OpenAI, Anthropic) | `phases/04-providers.md`    |
+| 5 | Integration  | ✅ Complete | Bridges, persistence, showcase        | `phases/05-integration.md`  |
 
 **Status Legend:**
 - ✅ Complete
@@ -306,6 +306,122 @@ How we know the project is complete:
 ## Session Log
 
 > **Purpose:** Track work across multiple sessions. Append new entries at the top.
+
+### 2026-01-17 Session 6
+
+**Started:** Phase 5, Deliverable 5.7 (Showcase Demo)
+**Completed:**
+- Implemented interactive Showcase Demo in `showcase/main.ts`
+  - Tabbed interface with 5 feature sections
+  - Embeddings tab: OpenAI, Voyage, Ollama, wrapper composition demos
+  - Providers tab: OpenAI, Anthropic, Ollama provider demos
+  - Helpers tab: Rate limiter, SSE parser, error handling demos
+  - Persistence tab: Session persistence demo with IndexedDB
+  - Bridges tab: Tool call bridge and retrieval tool demos
+  - Activity log with real-time output
+- Implemented Integration Tests:
+  - `tests/integration/embeddings.test.ts` (6 tests) - cached + batched composition
+  - `tests/integration/persistence.test.ts` (6 tests) - session CRUD + TTL
+  - `tests/integration/bridges.test.ts` (11 tests) - tool bridge + retrieval tool
+- Updated showcase styles for new tabbed UI
+- All quality gates passing (328 tests)
+- Showcase builds to single-file HTML successfully
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 5 ✅ Complete, Project Complete
+
+---
+
+### 2026-01-17 Session 5
+
+**Started:** Phase 5, Deliverable 5.1 (Session Persistence)
+**Completed:**
+- Implemented IndexedDB session persistence in `src/persistence/sessions/indexeddb.ts`
+  - TTL-based session expiration
+  - Session summary with title extraction from first user message
+  - Methods: save(), load(), remove(), all(), clear()
+- Implemented Tool Call Bridge in `src/bridges/tool-call.ts`
+  - Connects inference tool calls to contextprotocol execution
+  - Timeout handling with configurable duration
+  - Lifecycle hooks: onBeforeExecute, onAfterExecute, onError
+  - Parallel execution via executeAll()
+- Implemented Retrieval Tool Factory in `src/bridges/retrieval.ts`
+  - Creates tools for querying VectorStore
+  - Configurable topK and minScore
+  - Optional result formatting
+- Created comprehensive tests:
+  - `tests/persistence/sessions/indexeddb.test.ts` (20 tests)
+  - `tests/bridges/tool-call.test.ts` (14 tests)
+  - `tests/bridges/retrieval.test.ts` (9 tests)
+- Updated barrel exports for persistence and bridges
+- All quality gates passing (305 tests)
+- CodeQL security check passed
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 5 deliverables 5.1-5.6 ✅ Complete, ready for 5.7 Showcase Demo
+
+---
+
+### 2026-01-17 Session 4
+
+**Started:** Phase 3, Deliverable 3.1 (OpenAI Embedding Adapter)
+**Completed:**
+- Created Voyage embedding adapter in `src/embeddings/voyage.ts`
+  - Supports voyage-3, voyage-3-lite, voyage-code-3 models
+  - Model-specific dimension mapping
+  - Input type support for retrieval optimization
+- Created Ollama embedding adapter in `src/embeddings/ollama.ts`
+  - Uses `/api/embed` endpoint
+  - Timeout support and proper error handling
+- Completed Batched embedding wrapper in `src/embeddings/batched.ts`
+  - Full batching logic with deduplication
+  - Configurable batch size and flush delay
+  - Promise resolution for each caller
+- Reviewed and validated existing adapters (OpenAI, Cache)
+- Created comprehensive tests:
+  - `tests/embeddings/openai.test.ts` (11 tests)
+  - `tests/embeddings/voyage.test.ts` (12 tests)
+  - `tests/embeddings/ollama.test.ts` (10 tests)
+  - `tests/embeddings/batched.test.ts` (11 tests)
+  - `tests/embeddings/cached.test.ts` (12 tests)
+- Updated barrel exports for embeddings
+- All quality gates passing (222 tests)
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 3 ✅ Complete, ready for Phase 4
+
+---
+
+### 2026-01-17 Session 3
+
+**Started:** Phase 2, Deliverable 2.1 (SSE Parser)
+**Completed:**
+- Implemented SSE parser in `src/helpers/sse.ts` with full SSE spec support
+- Implemented Rate limiter in `src/helpers/rate-limiter.ts` with sliding window and concurrent limiting
+- Implemented Provider error mapping in `src/helpers/error-mapping.ts` (OpenAI, Anthropic, Ollama)
+- Implemented Retry wrapper in `src/wrappers/retryable.ts` with exponential backoff and jitter
+- Created barrel exports for `src/helpers/index.ts` and `src/wrappers/index.ts`
+- Updated `src/index.ts` to export new modules
+- Created comprehensive tests:
+  - `tests/helpers/sse.test.ts` (26 tests)
+  - `tests/helpers/rate-limiter.test.ts` (16 tests)
+  - `tests/helpers/error-mapping.test.ts` (39 tests)
+  - `tests/wrappers/retryable.test.ts` (21 tests)
+- Fixed TypeScript strictness issues (exactOptionalPropertyTypes, noUncheckedIndexedAccess)
+- All quality gates passing (166 tests)
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 2 ✅ Complete, ready for Phase 3
+
+---
 
 ### 2026-01-17 Session 2
 
