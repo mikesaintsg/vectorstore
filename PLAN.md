@@ -1,8 +1,8 @@
 # Project Plan: @mikesaintsg/adapters
 
-> **Status:** Phase 2 of 5 — Core Helpers
+> **Status:** Phase 3 of 5 — Embeddings
 > **Last Updated:** 2026-01-17
-> **Next Milestone:** SSE parser and rate limiter
+> **Next Milestone:** Embedding adapters
 
 ---
 
@@ -20,11 +20,11 @@
 ### Current Session State
 
 ```
-Phase: 2 of 5 (Core Helpers)
-Active Deliverable: 2.1 SSE Parser
-Checklist Progress: 0/20 items complete
-Last Action: Phase 1 Foundation complete (64 tests passing)
-Next Action: Implement SSE parser for streaming responses
+Phase: 3 of 5 (Embeddings)
+Active Deliverable: 3.1 OpenAI Embedding Adapter
+Checklist Progress: 0/N items complete
+Last Action: Phase 2 Core Helpers complete (166 tests passing)
+Next Action: Implement embedding adapters
 ```
 
 > **Instructions:** Update this section at the END of each session with the model.
@@ -154,11 +154,11 @@ How we know the project is complete:
 
 ## Phases
 
-| # | Phase        | Status     | Description                           | File                        |
-|---|--------------|------------|---------------------------------------|-----------------------------|
+| # | Phase        | Status      | Description                           | File                        |
+|---|--------------|-------------|---------------------------------------|-----------------------------|
 | 1 | Foundation   | ✅ Complete | Types, project structure, helpers     | `phases/01-foundation.md`   |
-| 2 | Core Helpers | 🔄 Active  | SSE parser, rate limiter, error maps  | `phases/02-core-helpers.md` |
-| 3 | Embeddings   | ⏳ Pending  | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
+| 2 | Core Helpers | ✅ Complete | SSE parser, rate limiter, error maps  | `phases/02-core-helpers.md` |
+| 3 | Embeddings   | 🔄 Active   | Embedding adapters and wrappers       | `phases/03-embeddings.md`   |
 | 4 | Providers    | ⏳ Pending  | Provider adapters (OpenAI, Anthropic) | `phases/04-providers.md`    |
 | 5 | Integration  | ⏳ Pending  | Bridges, persistence, showcase        | `phases/05-integration.md`  |
 
@@ -306,6 +306,31 @@ How we know the project is complete:
 ## Session Log
 
 > **Purpose:** Track work across multiple sessions. Append new entries at the top.
+
+### 2026-01-17 Session 3
+
+**Started:** Phase 2, Deliverable 2.1 (SSE Parser)
+**Completed:**
+- Implemented SSE parser in `src/helpers/sse.ts` with full SSE spec support
+- Implemented Rate limiter in `src/helpers/rate-limiter.ts` with sliding window and concurrent limiting
+- Implemented Provider error mapping in `src/helpers/error-mapping.ts` (OpenAI, Anthropic, Ollama)
+- Implemented Retry wrapper in `src/wrappers/retryable.ts` with exponential backoff and jitter
+- Created barrel exports for `src/helpers/index.ts` and `src/wrappers/index.ts`
+- Updated `src/index.ts` to export new modules
+- Created comprehensive tests:
+  - `tests/helpers/sse.test.ts` (26 tests)
+  - `tests/helpers/rate-limiter.test.ts` (16 tests)
+  - `tests/helpers/error-mapping.test.ts` (39 tests)
+  - `tests/wrappers/retryable.test.ts` (21 tests)
+- Fixed TypeScript strictness issues (exactOptionalPropertyTypes, noUncheckedIndexedAccess)
+- All quality gates passing (166 tests)
+
+**Blockers Discovered:**
+- None
+
+**Ended:** Phase 2 ✅ Complete, ready for Phase 3
+
+---
 
 ### 2026-01-17 Session 2
 
