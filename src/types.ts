@@ -210,57 +210,6 @@ export type OllamaChatModel =
 	| (string & {})
 
 // ============================================================================
-// Rate Limiting Types
-// ============================================================================
-
-/**
- * Rate limiter interface.
- * Allows coordinated rate limiting across adapters.
- */
-export interface RateLimiterInterface {
-	/** Acquire a slot, returns when available */
-	acquire(): Promise<void>
-	/** Release a slot */
-	release(): void
-	/** Get current state */
-	getState(): RateLimiterState
-	/** Set rate limit dynamically (e.g., from Retry-After header) */
-	setLimit(requestsPerMinute: number): void
-}
-
-/** Rate limiter state */
-export interface RateLimiterState {
-	/** Current number of active requests */
-	readonly activeRequests: number
-	/** Maximum concurrent requests */
-	readonly maxConcurrent: number
-	/** Requests made in current window */
-	readonly requestsInWindow: number
-	/** Requests allowed per minute */
-	readonly requestsPerMinute: number
-	/** Time until window resets (ms) */
-	readonly windowResetIn: number
-}
-
-/** Rate limiter options */
-export interface RateLimiterOptions {
-	/** Maximum requests per minute (default: 60) */
-	readonly requestsPerMinute?: number
-	/** Maximum concurrent requests (default: 10) */
-	readonly maxConcurrent?: number
-	/** Window size in ms (default: 60000) */
-	readonly windowMs?: number
-}
-
-/** Provider-specific rate limiter options (per-adapter) */
-export interface AdapterRateLimiterOptions extends RateLimiterOptions {
-	/** Optional shared rate limiter (for cross-adapter coordination) */
-	readonly sharedLimiter?: RateLimiterInterface
-	/** Use shared limiter instead of per-adapter (default: false) */
-	readonly useShared?: boolean
-}
-
-// ============================================================================
 // Policy Adapter Options
 // ============================================================================
 
@@ -373,25 +322,12 @@ export interface IndexedDBCacheAdapterOptions {
 
 /**
  * Batch adapter options.
- * Creates a BatchAdapterInterface with standard settings.
+ * Creates a BatchAdapterInterface with configurable settings.
  */
 export interface BatchAdapterOptions {
 	/** Maximum batch size (default: 100) */
 	readonly batchSize?: number
 	/** Delay between batches in ms (default: 50) */
-	readonly delayMs?: number
-	/** Deduplicate identical texts (default: true) */
-	readonly deduplicate?: boolean
-}
-
-/**
- * Aggressive batch adapter options.
- * Creates a BatchAdapterInterface with larger batches and longer delays.
- */
-export interface AggressiveBatchAdapterOptions {
-	/** Maximum batch size (default: 500) */
-	readonly batchSize?: number
-	/** Delay between batches in ms (default: 200) */
 	readonly delayMs?: number
 	/** Deduplicate identical texts (default: true) */
 	readonly deduplicate?: boolean
@@ -638,11 +574,6 @@ export type CreateOllamaEmbeddingAdapter = (
 	options: OllamaEmbeddingAdapterOptions
 ) => EmbeddingAdapterInterface
 
-/** Factory function for rate limiter */
-export type CreateRateLimiter = (
-	options?: RateLimiterOptions
-) => RateLimiterInterface
-
 // ============================================================================
 // Policy Adapter Factory Types
 // ============================================================================
@@ -657,9 +588,6 @@ export type CreateLinearRetryAdapter = (
 	options?: LinearRetryAdapterOptions
 ) => RetryAdapterInterface
 
-/** Factory for no-retry adapter (explicit opt-out) */
-export type CreateNoRetryAdapter = () => RetryAdapterInterface
-
 /** Factory for token bucket rate limit adapter */
 export type CreateTokenBucketRateLimitAdapter = (
 	options?: TokenBucketRateLimitAdapterOptions
@@ -669,9 +597,6 @@ export type CreateTokenBucketRateLimitAdapter = (
 export type CreateSlidingWindowRateLimitAdapter = (
 	options?: SlidingWindowRateLimitAdapterOptions
 ) => RateLimitAdapterInterface
-
-/** Factory for no rate limit adapter (explicit opt-out) */
-export type CreateNoRateLimitAdapter = () => RateLimitAdapterInterface
 
 // ============================================================================
 // Enhancement Adapter Factory Types
@@ -692,17 +617,9 @@ export type CreateIndexedDBCacheAdapter = (
 	options: IndexedDBCacheAdapterOptions
 ) => EmbeddingCacheAdapterInterface
 
-/** Factory for no cache adapter (explicit opt-out) */
-export type CreateNoCacheAdapter = () => EmbeddingCacheAdapterInterface
-
 /** Factory for batch adapter */
 export type CreateBatchAdapter = (
 	options?: BatchAdapterOptions
-) => BatchAdapterInterface
-
-/** Factory for aggressive batch adapter */
-export type CreateAggressiveBatchAdapter = (
-	options?: AggressiveBatchAdapterOptions
 ) => BatchAdapterInterface
 
 /** Factory for Cohere reranker adapter */
@@ -714,9 +631,6 @@ export type CreateCohereRerankerAdapter = (
 export type CreateCrossEncoderRerankerAdapter = (
 	options: CrossEncoderRerankerAdapterOptions
 ) => RerankerAdapterInterface
-
-/** Factory for no reranker adapter (explicit opt-out) */
-export type CreateNoRerankerAdapter = () => RerankerAdapterInterface
 
 // ============================================================================
 // Transform Adapter Factory Types
