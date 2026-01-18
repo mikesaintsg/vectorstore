@@ -96,7 +96,16 @@ export interface ExportedVectorStore {
 
 /** Load options for persistence operations */
 export interface LoadOptions {
-	readonly force?: boolean
+	/** Ignore model mismatch (force load) */
+	readonly ignoreMismatch?: boolean
+	/** Progress callback */
+	readonly onProgress?: (loaded: number, total: number) => void
+}
+
+/** Upsert options for bulk operations */
+export interface UpsertOptions {
+	/** Progress callback */
+	readonly onProgress?: (completed: number, total: number) => void
 }
 
 // ============================================================================
@@ -146,13 +155,24 @@ export interface VectorStoreOptions extends SubscriptionToHook<VectorStoreSubscr
 
 /** VectorStore error codes */
 export type VectorStoreErrorCode =
-	| 'NOT_FOUND'
+	// Embedding errors
+	| 'EMBEDDING_FAILED'
 	| 'MODEL_MISMATCH'
 	| 'DIMENSION_MISMATCH'
-	| 'PERSISTENCE_ERROR'
-	| 'EMBEDDING_ERROR'
+	// Storage errors
+	| 'PERSISTENCE_FAILED'
+	| 'LOAD_FAILED'
+	| 'SAVE_FAILED'
+	// Document errors
+	| 'DOCUMENT_NOT_FOUND'
+	| 'INVALID_DOCUMENT'
+	| 'DUPLICATE_DOCUMENT'
+	// Search errors
+	| 'SEARCH_FAILED'
+	| 'INVALID_QUERY'
+	// General
 	| 'NOT_LOADED'
-	| 'UNKNOWN'
+	| 'UNKNOWN_ERROR'
 
 // ============================================================================
 // Behavioral Interfaces

@@ -338,7 +338,7 @@ export class VectorStore implements VectorStoreInterface {
 
 		const storedMetadata = await this.#persistence.loadMetadata()
 
-		if (storedMetadata && !options?.force) {
+		if (storedMetadata && !options?.ignoreMismatch) {
 			const storedModelId = `${storedMetadata.provider}:${storedMetadata.model}`
 			if (storedModelId !== this.#modelId) {
 				throw new VectorStoreError(
@@ -351,8 +351,13 @@ export class VectorStore implements VectorStoreInterface {
 		const docs = await this.#persistence.load()
 		this.#documents.clear()
 
+		const total = docs.length
+		let loaded = 0
+
 		for (const doc of docs) {
 			this.#documents.set(doc.id, doc)
+			loaded++
+			options?.onProgress?.(loaded, total)
 		}
 
 		this.#loaded = true
@@ -376,7 +381,7 @@ export class VectorStore implements VectorStoreInterface {
 	}
 
 	async reload(): Promise<void> {
-		await this.load({ force: true })
+		await this.load({ ignoreMismatch: true })
 	}
 
 	async reindex(): Promise<void> {

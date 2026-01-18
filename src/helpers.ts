@@ -113,6 +113,20 @@ export function normalizeVector(vector: Embedding): Embedding {
 	return normalized
 }
 
+/**
+ * Compute the magnitude (length) of a vector.
+ *
+ * @param vector - Vector to compute magnitude for
+ * @returns Magnitude (L2 norm) of the vector
+ */
+export function magnitudeVector(vector: Embedding): number {
+	let sumSquares = 0
+	for (const val of vector) {
+		sumSquares += val * val
+	}
+	return Math.sqrt(sumSquares)
+}
+
 // ============================================================================
 // Keyword Scoring
 // ============================================================================

@@ -11,10 +11,14 @@ export { createVectorStore } from './factories.js'
 // Error classes
 export {
 	VectorStoreError,
+	ModelMismatchError,
 	isVectorStoreError,
 	isModelMismatchError,
 	isEmbeddingError,
 	isPersistenceError,
+	isDocumentError,
+	isSearchError,
+	isDimensionMismatchError,
 } from './errors.js'
 
 // Helper functions
@@ -23,6 +27,7 @@ export {
 	dotProductSimilarity,
 	euclideanSimilarity,
 	normalizeVector,
+	magnitudeVector,
 	computeKeywordScore,
 	tokenize,
 	estimateDocumentBytes,
@@ -51,6 +56,7 @@ export type {
 	MemoryInfo,
 	ExportedVectorStore,
 	LoadOptions,
+	UpsertOptions,
 	VectorStoreSubscriptions,
 	VectorStoreOptions,
 	VectorStoreErrorCode,

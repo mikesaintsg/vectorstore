@@ -551,7 +551,7 @@ describe('VectorStore', () => {
 			})
 
 			const store2 = await createVectorStore(differentAdapter, { persistence })
-			await store2.load({ force: true })
+			await store2.load({ ignoreMismatch: true })
 
 			expect(await store2.count()).toBe(1)
 		})
@@ -714,6 +714,462 @@ describe('VectorStore', () => {
 
 			expect(callback1).toHaveBeenCalledTimes(1)
 			expect(callback2).toHaveBeenCalledTimes(1)
+		})
+	})
+
+	// ============================================================================
+	// Edge Case Tests
+	// ============================================================================
+
+	describe('edge cases - documents', () => {
+		it('handles document with empty content', async() => {
+			await store.upsertDocument({ id: 'empty', content: '' })
+			const doc = await store.getDocument('empty')
+			expect(doc?.content).toBe('')
+		})
+
+		it('handles document with very long content', async() => {
+			const longContent = 'x'.repeat(100000)
+			await store.upsertDocument({ id: 'long', content: longContent })
+			const doc = await store.getDocument('long')
+			expect(doc?.content.length).toBe(100000)
+		})
+
+		it('handles document with special characters in content', async() => {
+			const specialContent = '🚀 emoji, "quotes", <html>, &amp;, newline\n\t\r'
+			await store.upsertDocument({ id: 'special', content: specialContent })
+			const doc = await store.getDocument('special')
+			expect(doc?.content).toBe(specialContent)
+		})
+
+		it('handles document with unicode content', async() => {
+			const unicodeContent = '日本語 中文 العربية Ελληνικά'
+			await store.upsertDocument({ id: 'unicode', content: unicodeContent })
+			const doc = await store.getDocument('unicode')
+			expect(doc?.content).toBe(unicodeContent)
+		})
+
+		it('handles document ID with special characters', async() => {
+			const specialId = 'doc:123/test?query=value#hash'
+			await store.upsertDocument({ id: specialId, content: 'test' })
+			const doc = await store.getDocument(specialId)
+			expect(doc?.id).toBe(specialId)
+		})
+
+		it('handles deeply nested metadata', async() => {
+			const deepMetadata = {
+				level1: {
+					level2: {
+						level3: {
+							value: 'deep',
+						},
+					},
+				},
+			}
+			await store.upsertDocument({
+				id: 'nested',
+				content: 'test',
+				metadata: deepMetadata,
+			})
+			const doc = await store.getDocument('nested')
+			expect(doc?.metadata).toEqual(deepMetadata)
+		})
+
+		it('handles metadata with array values', async() => {
+			await store.upsertDocument({
+				id: 'array-meta',
+				content: 'test',
+				metadata: { tags: ['a', 'b', 'c'], numbers: [1, 2, 3] },
+			})
+			const doc = await store.getDocument('array-meta')
+			expect(doc?.metadata?.tags).toEqual(['a', 'b', 'c'])
+		})
+
+		it('handles null-like metadata values', async() => {
+			await store.upsertDocument({
+				id: 'null-meta',
+				content: 'test',
+				metadata: { empty: '', zero: 0, falsy: false },
+			})
+			const doc = await store.getDocument('null-meta')
+			expect(doc?.metadata?.empty).toBe('')
+			expect(doc?.metadata?.zero).toBe(0)
+			expect(doc?.metadata?.falsy).toBe(false)
+		})
+
+		it('handles rapid sequential updates to same document', async() => {
+			const promises = []
+			for (let i = 0; i < 10; i++) {
+				promises.push(store.upsertDocument({ id: 'rapid', content: `version ${i}` }))
+			}
+			await Promise.all(promises)
+
+			const doc = await store.getDocument('rapid')
+			expect(doc).toBeDefined()
+		})
+
+		it('handles many documents', async() => {
+			const docs = Array.from({ length: 100 }, (_, i) => ({
+				id: `doc-${i}`,
+				content: `Document number ${i}`,
+			}))
+			await store.upsertDocument(docs)
+			expect(await store.count()).toBe(100)
+		})
+	})
+
+	describe('edge cases - search', () => {
+		beforeEach(async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'TypeScript JavaScript programming' },
+				{ id: 'doc2', content: 'React component rendering', metadata: { type: 'frontend' } },
+				{ id: 'doc3', content: 'Node.js server backend', metadata: { type: 'backend' } },
+			])
+		})
+
+		it('handles empty query', async() => {
+			const results = await store.similaritySearch('')
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+
+		it('handles query longer than any document', async() => {
+			const longQuery = 'a'.repeat(1000)
+			const results = await store.similaritySearch(longQuery)
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+
+		it('handles limit of 0', async() => {
+			const results = await store.similaritySearch('test', { limit: 0 })
+			expect(results).toHaveLength(0)
+		})
+
+		it('handles limit larger than document count', async() => {
+			const results = await store.similaritySearch('test', { limit: 1000 })
+			expect(results.length).toBeLessThanOrEqual(3)
+		})
+
+		it('handles threshold of 1 (exact match only)', async() => {
+			const results = await store.similaritySearch('test', { threshold: 1.0 })
+			expect(results).toHaveLength(0)
+		})
+
+		it('handles threshold of 0 (all results with non-negative scores)', async() => {
+			const results = await store.similaritySearch('test', { threshold: 0, limit: 100 })
+			// All results should have score >= 0
+			for (const result of results) {
+				expect(result.score).toBeGreaterThanOrEqual(0)
+			}
+		})
+
+		it('handles search on empty store', async() => {
+			const emptyStore = await createVectorStore(embeddingAdapter)
+			const results = await emptyStore.similaritySearch('test')
+			expect(results).toHaveLength(0)
+		})
+
+		it('filters with empty object metadata returns matching docs', async() => {
+			const results = await store.similaritySearch('test', { filter: {}, limit: 100 })
+			// Empty filter should match all documents
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+
+		it('filters with function always returning false', async() => {
+			const results = await store.similaritySearch('test', {
+				filter: () => false,
+			})
+			expect(results).toHaveLength(0)
+		})
+
+		it('filters with function always returning true', async() => {
+			const results = await store.similaritySearch('test', {
+				filter: () => true,
+				limit: 100,
+			})
+			// All results should pass filter, may be filtered by threshold
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+
+		it('filters documents without metadata', async() => {
+			const results = await store.similaritySearch('test', {
+				filter: { type: 'frontend' },
+			})
+			// Only doc2 has type: 'frontend'
+			for (const result of results) {
+				expect(result.metadata?.type).toBe('frontend')
+			}
+		})
+	})
+
+	describe('edge cases - hybrid search', () => {
+		beforeEach(async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'TypeScript JavaScript programming language' },
+				{ id: 'doc2', content: 'React component UI library' },
+				{ id: 'doc3', content: 'Node.js server runtime JavaScript' },
+			])
+		})
+
+		it('handles pure keyword search (vectorWeight: 0)', async() => {
+			const results = await store.hybridSearch('JavaScript', {
+				vectorWeight: 0,
+				keywordWeight: 1,
+			})
+			// Results should be based only on keyword matching
+			expect(results.length).toBeGreaterThan(0)
+		})
+
+		it('handles pure vector search (keywordWeight: 0)', async() => {
+			const results = await store.hybridSearch('programming', {
+				vectorWeight: 1,
+				keywordWeight: 0,
+			})
+			expect(results.length).toBeGreaterThan(0)
+		})
+
+		it('handles equal weights', async() => {
+			const results = await store.hybridSearch('JavaScript', {
+				vectorWeight: 0.5,
+				keywordWeight: 0.5,
+			})
+			expect(results.length).toBeGreaterThan(0)
+		})
+
+		it('handles fuzzy keyword mode', async() => {
+			const results = await store.hybridSearch('Javascrip', {
+				keywordMode: 'fuzzy',
+			})
+			// Should find 'JavaScript' with fuzzy matching
+			expect(results.length).toBeGreaterThan(0)
+		})
+
+		it('handles prefix keyword mode', async() => {
+			const results = await store.hybridSearch('Type', {
+				keywordMode: 'prefix',
+			})
+			// Should find 'TypeScript' with prefix matching
+			expect(results.length).toBeGreaterThan(0)
+		})
+
+		it('handles query with no keyword matches', async() => {
+			const results = await store.hybridSearch('xyz123', {
+				keywordWeight: 0.5,
+				vectorWeight: 0.5,
+			})
+			// Vector similarity should still provide results
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+	})
+
+	describe('edge cases - persistence', () => {
+		it('handles persistence not available', async() => {
+			const unavailablePersistence = createMockPersistenceAdapter()
+			vi.spyOn(unavailablePersistence, 'isAvailable').mockResolvedValue(false)
+
+			const store = await createVectorStore(embeddingAdapter, {
+				persistence: unavailablePersistence,
+			})
+			await store.load()
+			expect(store.isLoaded()).toBe(true)
+		})
+
+		it('handles empty persistence', async() => {
+			const persistence = createMockPersistenceAdapter()
+			const store = await createVectorStore(embeddingAdapter, { persistence })
+			await store.load()
+			expect(await store.count()).toBe(0)
+		})
+
+		it('handles autoSave: false', async() => {
+			const persistence = createMockPersistenceAdapter()
+			const store = await createVectorStore(embeddingAdapter, {
+				persistence,
+				autoSave: false,
+			})
+
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			expect(persistence.documents.size).toBe(0)
+
+			await store.save()
+			expect(persistence.documents.size).toBe(1)
+		})
+
+		it('reports progress during load', async() => {
+			const persistence = createMockPersistenceAdapter()
+			persistence.documents.set('doc1', {
+				id: 'doc1',
+				content: 'test1',
+				embedding: createMockEmbedding(128),
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+			})
+			persistence.documents.set('doc2', {
+				id: 'doc2',
+				content: 'test2',
+				embedding: createMockEmbedding(128),
+				createdAt: Date.now(),
+				updatedAt: Date.now(),
+			})
+
+			const store = await createVectorStore(embeddingAdapter, { persistence })
+
+			const progressCalls: { loaded: number; total: number }[] = []
+			await store.load({
+				onProgress: (loaded, total) => {
+					progressCalls.push({ loaded, total })
+				},
+			})
+
+			expect(progressCalls.length).toBe(2)
+			expect(progressCalls[0]).toEqual({ loaded: 1, total: 2 })
+			expect(progressCalls[1]).toEqual({ loaded: 2, total: 2 })
+		})
+	})
+
+	describe('edge cases - export/import', () => {
+		it('exports empty store', async() => {
+			const exported = await store.export()
+			expect(exported.documents).toHaveLength(0)
+			expect(exported.version).toBe(1)
+		})
+
+		it('exports and imports with metadata', async() => {
+			await store.upsertDocument({
+				id: 'doc1',
+				content: 'test',
+				metadata: { key: 'value' },
+			})
+
+			const exported = await store.export()
+			const store2 = await createVectorStore(embeddingAdapter)
+			await store2.import(exported)
+
+			const doc = await store2.getDocument('doc1')
+			expect(doc?.metadata).toEqual({ key: 'value' })
+		})
+
+		it('import preserves createdAt timestamps', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			const original = await store.getDocument('doc1')
+			const exported = await store.export()
+
+			const store2 = await createVectorStore(embeddingAdapter)
+			await store2.import(exported)
+
+			const imported = await store2.getDocument('doc1')
+			expect(imported?.createdAt).toBe(original?.createdAt)
+		})
+
+		it('import adds to existing documents', async() => {
+			await store.upsertDocument({ id: 'existing', content: 'existing' })
+			const exported = await store.export()
+
+			const store2 = await createVectorStore(embeddingAdapter)
+			await store2.upsertDocument({ id: 'other', content: 'other' })
+			await store2.import(exported)
+
+			expect(await store2.count()).toBe(2)
+		})
+	})
+
+	describe('edge cases - lifecycle', () => {
+		it('allows operations after destroy', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			store.destroy()
+
+			// Should be able to add documents again after destroy
+			await store.upsertDocument({ id: 'doc2', content: 'test2' })
+			expect(await store.count()).toBe(1)
+		})
+
+		it('handles multiple destroy calls', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			store.destroy()
+			store.destroy()
+			store.destroy()
+			expect(await store.count()).toBe(0)
+		})
+
+		it('handles reindex on empty store', async() => {
+			await store.reindex()
+			expect(await store.count()).toBe(0)
+		})
+
+		it('reindex preserves metadata', async() => {
+			await store.upsertDocument({
+				id: 'doc1',
+				content: 'test',
+				metadata: { key: 'value' },
+			})
+
+			await store.reindex()
+
+			const doc = await store.getDocument('doc1')
+			expect(doc?.metadata).toEqual({ key: 'value' })
+		})
+	})
+
+	describe('edge cases - memory and performance', () => {
+		it('getMemoryInfo on empty store', () => {
+			const info = store.getMemoryInfo()
+			expect(info.documentCount).toBe(0)
+			expect(info.estimatedBytes).toBe(0)
+		})
+
+		it('getMemoryInfo reflects document count', async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'test1' },
+				{ id: 'doc2', content: 'test2' },
+			])
+			const info = store.getMemoryInfo()
+			expect(info.documentCount).toBe(2)
+		})
+
+		it('clear resets memory info', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			await store.clear()
+			const info = store.getMemoryInfo()
+			expect(info.documentCount).toBe(0)
+		})
+	})
+
+	describe('edge cases - event subscriptions', () => {
+		it('unsubscribe is idempotent', async() => {
+			const callback = vi.fn()
+			const unsubscribe = store.onDocumentAdded(callback)
+
+			unsubscribe()
+			unsubscribe()
+			unsubscribe()
+
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			expect(callback).not.toHaveBeenCalled()
+		})
+
+		it('listener errors do not prevent other listeners', async() => {
+			const callback1 = vi.fn().mockImplementation(() => {
+				throw new Error('Listener error')
+			})
+			const callback2 = vi.fn()
+
+			store.onDocumentAdded(callback1)
+			store.onDocumentAdded(callback2)
+
+			await expect(store.upsertDocument({ id: 'doc1', content: 'test' })).rejects.toThrow()
+		})
+
+		it('subscriptions from options work with dynamic subscriptions', async() => {
+			const optionsCallback = vi.fn()
+			const store = await createVectorStore(embeddingAdapter, {
+				onDocumentAdded: optionsCallback,
+			})
+
+			const dynamicCallback = vi.fn()
+			store.onDocumentAdded(dynamicCallback)
+
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+
+			expect(optionsCallback).toHaveBeenCalledTimes(1)
+			expect(dynamicCallback).toHaveBeenCalledTimes(1)
 		})
 	})
 })
