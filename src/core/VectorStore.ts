@@ -36,6 +36,8 @@ import {
 	estimateDocumentBytes,
 } from '../helpers.js'
 
+import { VectorStoreError } from '../errors.js'
+
 import {
 	DEFAULT_SEARCH_LIMIT,
 	DEFAULT_VECTOR_WEIGHT,
@@ -339,7 +341,8 @@ export class VectorStore implements VectorStoreInterface {
 		if (storedMetadata && !options?.force) {
 			const storedModelId = `${storedMetadata.provider}:${storedMetadata.model}`
 			if (storedModelId !== this.#modelId) {
-				throw new Error(
+				throw new VectorStoreError(
+					'MODEL_MISMATCH',
 					`Model mismatch: stored embeddings use '${storedModelId}' but current adapter uses '${this.#modelId}'`,
 				)
 			}
@@ -431,7 +434,8 @@ export class VectorStore implements VectorStoreInterface {
 
 	async import(data: ExportedVectorStore): Promise<void> {
 		if (data.modelId !== this.#modelId) {
-			throw new Error(
+			throw new VectorStoreError(
+				'MODEL_MISMATCH',
 				`Model mismatch: imported data uses '${data.modelId}' but current adapter uses '${this.#modelId}'`,
 			)
 		}
