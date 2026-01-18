@@ -136,6 +136,7 @@ store.destroy()
 | `dotProductSimilarity(a, b)`              | Compute dot product                 |
 | `euclideanSimilarity(a, b)`               | Compute euclidean similarity        |
 | `normalizeVector(vector)`                 | Normalize to unit length            |
+| `magnitudeVector(vector)`                 | Compute vector magnitude (L2 norm)  |
 | `computeKeywordScore(query, content, mode)` | Compute keyword match score       |
 | `tokenize(text)`                          | Tokenize text to terms              |
 | `estimateDocumentBytes(doc)`              | Estimate document memory usage      |

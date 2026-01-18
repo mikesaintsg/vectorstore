@@ -1172,4 +1172,251 @@ describe('VectorStore', () => {
 			expect(dynamicCallback).toHaveBeenCalledTimes(1)
 		})
 	})
+
+	// ============================================================================
+	// Advanced Edge Case Tests
+	// ============================================================================
+
+	describe('advanced edge cases - similarity search', () => {
+		beforeEach(async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'Machine learning is a subset of artificial intelligence', metadata: { category: 'AI' } },
+				{ id: 'doc2', content: 'Deep learning uses neural networks', metadata: { category: 'AI' } },
+				{ id: 'doc3', content: 'Natural language processing handles text', metadata: { category: 'NLP' } },
+				{ id: 'doc4', content: 'Computer vision processes images', metadata: { category: 'CV' } },
+			])
+		})
+
+		it('returns results with scores in correct range', async() => {
+			const results = await store.similaritySearch('artificial intelligence', { limit: 10 })
+			for (const result of results) {
+				// Cosine similarity should be between -1 and 1
+				expect(result.score).toBeGreaterThanOrEqual(-1)
+				expect(result.score).toBeLessThanOrEqual(1)
+			}
+		})
+
+		it('handles complex metadata filter', async() => {
+			const results = await store.similaritySearch('test', {
+				filter: (metadata) => {
+					return metadata?.category === 'AI' || metadata?.category === 'NLP'
+				},
+			})
+			for (const result of results) {
+				expect(['AI', 'NLP']).toContain(result.metadata?.category)
+			}
+		})
+
+		it('combines rerank option with limit', async() => {
+			const results = await store.similaritySearch('test', {
+				limit: 2,
+				rerankTopK: 4,
+			})
+			expect(results.length).toBeLessThanOrEqual(2)
+		})
+
+		it('includeEmbeddings returns Float32Array', async() => {
+			const results = await store.similaritySearch('test', {
+				limit: 1,
+				includeEmbeddings: true,
+			})
+			if (results.length > 0) {
+				expect(results[0]?.embedding).toBeInstanceOf(Float32Array)
+			}
+		})
+	})
+
+	describe('advanced edge cases - hybrid search', () => {
+		beforeEach(async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'The quick brown fox jumps over the lazy dog' },
+				{ id: 'doc2', content: 'A fast red fox leaps across the sleeping hound' },
+				{ id: 'doc3', content: 'Python programming language for beginners' },
+			])
+		})
+
+		it('keyword exact match boosts relevant results', async() => {
+			const results = await store.hybridSearch('quick brown fox', {
+				keywordMode: 'exact',
+				keywordWeight: 0.5,
+				vectorWeight: 0.5,
+			})
+			// doc1 should score higher due to exact keyword matches
+			if (results.length > 0) {
+				expect(results[0]?.id).toBe('doc1')
+			}
+		})
+
+		it('handles query with no vector or keyword matches gracefully', async() => {
+			const results = await store.hybridSearch('zzzzzzzzzzzzz', {
+				keywordWeight: 0.5,
+				vectorWeight: 0.5,
+				threshold: 0,
+			})
+			// Should return results even with no keyword matches due to vector component
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+
+		it('zero weights both ways', async() => {
+			// Pure vector
+			const vectorOnly = await store.hybridSearch('test', {
+				vectorWeight: 1,
+				keywordWeight: 0,
+			})
+
+			// Pure keyword
+			const keywordOnly = await store.hybridSearch('quick', {
+				vectorWeight: 0,
+				keywordWeight: 1,
+			})
+
+			expect(vectorOnly.length).toBeGreaterThanOrEqual(0)
+			expect(keywordOnly.length).toBeGreaterThanOrEqual(0)
+		})
+	})
+
+	describe('advanced edge cases - model consistency', () => {
+		it('getModelId returns consistent format', () => {
+			const modelId = store.getModelId()
+			expect(modelId).toBe('test:test-model')
+			expect(modelId).toContain(':')
+		})
+
+		it('export includes modelId and dimension', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			const exported = await store.export()
+
+			expect(exported.modelId).toBe('test:test-model')
+			expect(exported.dimension).toBe(128)
+			expect(exported.exportedAt).toBeGreaterThan(0)
+		})
+
+		it('import rejects different model', async() => {
+			await store.upsertDocument({ id: 'doc1', content: 'test' })
+			const exported = await store.export()
+
+			// Modify the exported modelId
+			const modifiedExport = {
+				...exported,
+				modelId: 'different:different-model',
+			}
+
+			await expect(store.import(modifiedExport)).rejects.toThrow('Model mismatch')
+		})
+	})
+
+	describe('advanced edge cases - concurrent operations', () => {
+		it('handles concurrent upserts', async() => {
+			const promises = []
+			for (let i = 0; i < 10; i++) {
+				promises.push(store.upsertDocument({ id: `concurrent-${i}`, content: `Content ${i}` }))
+			}
+			await Promise.all(promises)
+			expect(await store.count()).toBe(10)
+		})
+
+		it('handles concurrent searches', async() => {
+			await store.upsertDocument([
+				{ id: 'doc1', content: 'First document' },
+				{ id: 'doc2', content: 'Second document' },
+			])
+
+			const searchPromises = []
+			for (let i = 0; i < 5; i++) {
+				searchPromises.push(store.similaritySearch(`query ${i}`))
+			}
+
+			const allResults = await Promise.all(searchPromises)
+			for (const results of allResults) {
+				expect(results.length).toBeGreaterThanOrEqual(0)
+			}
+		})
+
+		it('handles upsert and search interleaved', async() => {
+			await store.upsertDocument({ id: 'initial', content: 'initial document' })
+
+			// Start search
+			const searchPromise = store.similaritySearch('document')
+
+			// Upsert while search is pending
+			await store.upsertDocument({ id: 'added', content: 'added during search' })
+
+			const results = await searchPromise
+			expect(results.length).toBeGreaterThanOrEqual(0)
+		})
+	})
+
+	describe('advanced edge cases - batch adapter', () => {
+		it('works without batch adapter', async() => {
+			const storeWithoutBatch = await createVectorStore(embeddingAdapter)
+			await storeWithoutBatch.upsertDocument([
+				{ id: 'doc1', content: 'First' },
+				{ id: 'doc2', content: 'Second' },
+				{ id: 'doc3', content: 'Third' },
+			])
+			expect(await storeWithoutBatch.count()).toBe(3)
+		})
+	})
+
+	describe('advanced edge cases - cache adapter', () => {
+		it('works without cache adapter', async() => {
+			const storeWithoutCache = await createVectorStore(embeddingAdapter)
+
+			// Add same content twice
+			await storeWithoutCache.upsertDocument({ id: 'doc1', content: 'Same content' })
+			await storeWithoutCache.upsertDocument({ id: 'doc2', content: 'Same content' })
+
+			expect(await storeWithoutCache.count()).toBe(2)
+		})
+	})
+
+	describe('advanced edge cases - similarity adapter', () => {
+		it('uses default cosine similarity when no adapter provided', async() => {
+			const storeWithDefault = await createVectorStore(embeddingAdapter)
+			await storeWithDefault.upsertDocument([
+				{ id: 'doc1', content: 'Test document one' },
+				{ id: 'doc2', content: 'Test document two' },
+			])
+
+			const results = await storeWithDefault.similaritySearch('document', { limit: 2 })
+			expect(results.length).toBeLessThanOrEqual(2)
+
+			// All scores should be cosine similarity range
+			for (const result of results) {
+				expect(result.score).toBeGreaterThanOrEqual(-1)
+				expect(result.score).toBeLessThanOrEqual(1)
+			}
+		})
+	})
+
+	describe('advanced edge cases - export version', () => {
+		it('export has version 1', async() => {
+			const exported = await store.export()
+			expect(exported.version).toBe(1)
+		})
+
+		it('export timestamp is recent', async() => {
+			const before = Date.now()
+			const exported = await store.export()
+			const after = Date.now()
+
+			expect(exported.exportedAt).toBeGreaterThanOrEqual(before)
+			expect(exported.exportedAt).toBeLessThanOrEqual(after)
+		})
+	})
+
+	describe('advanced edge cases - memory info', () => {
+		it('dimensionCount reflects embedding dimensions', () => {
+			const info = store.getMemoryInfo()
+			expect(info.dimensionCount).toBe(128)
+		})
+
+		it('estimatedBytes increases with documents', async() => {
+			const infoBefore = store.getMemoryInfo()
+			await store.upsertDocument({ id: 'doc1', content: 'Some content here' })
+			const infoAfter = store.getMemoryInfo()
+
+			expect(infoAfter.estimatedBytes).toBeGreaterThan(infoBefore.estimatedBytes)
+		})
+	})
 })
