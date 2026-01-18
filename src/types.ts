@@ -3,6 +3,15 @@
  *
  * Type definitions for the vectorstore library.
  * All public types and interfaces are defined here as the SOURCE OF TRUTH.
+ *
+ * Types provided by @mikesaintsg/core (DO NOT RE-EXPORT):
+ * - Unsubscribe, SubscriptionToHook
+ * - Embedding, EmbeddingAdapterInterface, EmbeddingModelMetadata
+ * - ScoredResult, StoredDocument, VectorStoreMetadata
+ * - VectorStorePersistenceAdapterInterface, SimilarityAdapterInterface
+ * - RetryAdapterInterface, RateLimitAdapterInterface
+ * - EmbeddingCacheAdapterInterface, BatchAdapterInterface, RerankerAdapterInterface
+ * - MinimalDatabaseAccess, MinimalDirectoryAccess, AbortableOptions
  */
 
 import type {
@@ -10,10 +19,8 @@ import type {
 	SubscriptionToHook,
 	Embedding,
 	EmbeddingAdapterInterface,
-	PackageErrorData,
 	ScoredResult,
-	MinimalDatabaseAccess,
-	MinimalDirectoryAccess,
+	StoredDocument,
 	VectorStorePersistenceAdapterInterface,
 	SimilarityAdapterInterface,
 	RetryAdapterInterface,
@@ -28,40 +35,23 @@ import type {
 // ============================================================================
 
 /** Document metadata */
-export type DocumentMetadata = Readonly<Record<string, unknown>>;
+export type DocumentMetadata = Readonly<Record<string, unknown>>
 
-/** Input document */
+/** Input document for upsert operations */
 export interface Document {
 	readonly id: string
 	readonly content: string
 	readonly metadata?: DocumentMetadata
 }
 
-/** Stored document with embedding */
-export interface StoredDocument {
-	readonly id: string
-	readonly content: string
-	readonly embedding: Embedding
-	readonly metadata?: DocumentMetadata
-	readonly createdAt: number
-	readonly updatedAt: number
-}
-
 // ============================================================================
 // Search Types
 // ============================================================================
 
-/** Metadata filter */
+/** Metadata filter - object for exact match or function for custom filtering */
 export type MetadataFilter =
 	| Record<string, unknown>
 	| ((metadata: DocumentMetadata | undefined) => boolean)
-
-/** Similarity function */
-export type SimilarityFunction =
-	| 'cosine'
-	| 'dot'
-	| 'euclidean'
-	| ((a: Embedding, b: Embedding) => number)
 
 /** Similarity search options */
 export interface SimilaritySearchOptions {
@@ -73,7 +63,7 @@ export interface SimilaritySearchOptions {
 	readonly rerankTopK?: number
 }
 
-/** Hybrid search options */
+/** Hybrid search options extending similarity search */
 export interface HybridSearchOptions extends SimilaritySearchOptions {
 	readonly vectorWeight?: number
 	readonly keywordWeight?: number
@@ -81,34 +71,30 @@ export interface HybridSearchOptions extends SimilaritySearchOptions {
 }
 
 // ============================================================================
-// Persistence Types
+// Info Types
 // ============================================================================
 
-/** Vector store metadata */
-export interface VectorStoreMetadata {
-	readonly modelId: string
-	readonly dimension: number
-	readonly documentCount: number
-	readonly createdAt: number
-	readonly updatedAt: number
-}
-
-/** Memory info */
+/** Memory usage information */
 export interface MemoryInfo {
 	readonly documentCount: number
 	readonly estimatedBytes: number
 	readonly dimensionCount: number
 }
 
-/** Exported vector store */
+// ============================================================================
+// Export/Import Types
+// ============================================================================
+
+/** Exported vector store data for serialization */
 export interface ExportedVectorStore {
 	readonly version: number
 	readonly exportedAt: number
-	readonly metadata: VectorStoreMetadata
+	readonly modelId: string
+	readonly dimension: number
 	readonly documents: readonly StoredDocument[]
 }
 
-/** Load options */
+/** Load options for persistence operations */
 export interface LoadOptions {
 	readonly force?: boolean
 }
@@ -167,11 +153,6 @@ export type VectorStoreErrorCode =
 	| 'EMBEDDING_ERROR'
 	| 'NOT_LOADED'
 	| 'UNKNOWN'
-
-/** VectorStore error data interface */
-export interface VectorStoreErrorData extends PackageErrorData<VectorStoreErrorCode> {
-	readonly documentId?: string
-}
 
 // ============================================================================
 // Behavioral Interfaces
@@ -308,37 +289,3 @@ export type CreateVectorStore = (
 	embedding: EmbeddingAdapterInterface,
 	options?: VectorStoreOptions
 ) => Promise<VectorStoreInterface>
-
-/** Factory function for in-memory persistence adapter */
-export type CreateInMemoryPersistenceAdapter = () => VectorStorePersistenceAdapterInterface
-
-/** Factory function for IndexedDB persistence adapter */
-export interface IndexedDBPersistenceAdapterOptions {
-	readonly database: MinimalDatabaseAccess<StoredDocument>
-	readonly documentsStore?: string
-	readonly metadataStore?: string
-}
-
-export type CreateIndexedDBPersistenceAdapter = (
-	options: IndexedDBPersistenceAdapterOptions
-) => VectorStorePersistenceAdapterInterface
-
-/** Factory function for OPFS persistence adapter */
-export interface OPFSPersistenceAdapterOptions {
-	readonly directory: MinimalDirectoryAccess
-	readonly chunkSize?: number
-}
-
-export type CreateOPFSPersistenceAdapter = (
-	options: OPFSPersistenceAdapterOptions
-) => VectorStorePersistenceAdapterInterface
-
-/** Factory function for HTTP persistence adapter */
-export interface HTTPPersistenceAdapterOptions {
-	readonly baseURL: string
-	readonly headers?: Readonly<Record<string, string>>
-}
-
-export type CreateHTTPPersistenceAdapter = (
-	options: HTTPPersistenceAdapterOptions
-) => VectorStorePersistenceAdapterInterface
