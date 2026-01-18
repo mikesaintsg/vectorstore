@@ -1,1063 +1,344 @@
 /**
- * @mikesaintsg/adapters
+ * @mikesaintsg/vectorstore
  *
- * Type definitions for the adapters package.
- * This file contains adapter-specific options and configuration types.
- *
- * Architecture:
- * - Interface definitions come from @mikesaintsg/core
- * - Message/Generation types come from @mikesaintsg/inference
- * - Options types and adapter-specific types are defined here
- *
- * Implementation Recommendations:
- * - Error mapping should be comprehensive:
- *   - Map ALL provider error codes to `AdapterErrorCode`
- *   - Include `providerCode` (original provider error code) in error data
- *   - Include `retryAfter` (milliseconds) for rate limit errors
- *   - Include `context` for debugging information
- * - Rate limiting: Per-adapter with optional shared rate limiter
- * - Retry logic: In adapters via `withRetry()` wrapper
- * - SSE parsing: Shared via helpers/sse.ts for OpenAI, Anthropic, Ollama
- * - Token counting: Model-specific via TokenCounterOptions
+ * Type definitions for the vectorstore library.
+ * All public types and interfaces are defined here as the SOURCE OF TRUTH.
  */
 
-// ============================================================================
-// Imports from @mikesaintsg/core
-// ============================================================================
-
 import type {
+	Unsubscribe,
+	SubscriptionToHook,
 	Embedding,
 	EmbeddingAdapterInterface,
-	ToolFormatAdapterInterface,
-	GenerationDefaults,
-	VectorStorePersistenceAdapterInterface,
+	PackageErrorData,
+	ScoredResult,
 	MinimalDatabaseAccess,
 	MinimalDirectoryAccess,
-	// Policy adapter interfaces
+	VectorStorePersistenceAdapterInterface,
+	SimilarityAdapterInterface,
 	RetryAdapterInterface,
 	RateLimitAdapterInterface,
-	// Enhancement adapter interfaces
 	EmbeddingCacheAdapterInterface,
 	BatchAdapterInterface,
-	SimilarityAdapterInterface,
 	RerankerAdapterInterface,
-	// Context builder adapter interfaces
-	DeduplicationAdapterInterface,
-	TruncationAdapterInterface,
-	PriorityAdapterInterface,
-	DeduplicationStrategy,
-	FramePriority,
-	// Bridge interfaces
-	ToolCallBridgeInterface,
-	ToolCallBridgeOptions,
-	RetrievalToolOptions,
-	RetrievalToolInterface,
-	SessionPersistenceInterface,
-	// Provider adapter interface
-	ProviderAdapterInterface,
 } from '@mikesaintsg/core'
 
 // ============================================================================
-// Provider Adapter Options
+// Document Types
 // ============================================================================
 
-/** OpenAI provider adapter options */
-export interface OpenAIProviderAdapterOptions {
-	/** OpenAI API key */
-	readonly apiKey: string
-	/** Model to use (default: 'gpt-4o') */
-	readonly model?: string
-	/** Base URL for API (default: 'https://api.openai.com/v1') */
-	readonly baseURL?: string
-	/** Organization ID */
-	readonly organization?: string
-	/** Default generation options */
-	readonly defaultOptions?: GenerationDefaults
+/** Document metadata */
+export type DocumentMetadata = Readonly<Record<string, unknown>>;
+
+/** Input document */
+export interface Document {
+	readonly id: string
+	readonly content: string
+	readonly metadata?: DocumentMetadata
 }
 
-/** Anthropic provider adapter options */
-export interface AnthropicProviderAdapterOptions {
-	/** Anthropic API key */
-	readonly apiKey: string
-	/** Model to use (default: 'claude-3-5-sonnet-20241022') */
-	readonly model?: string
-	/** Base URL for API (default: 'https://api.anthropic.com') */
-	readonly baseURL?: string
-	/** Default generation options */
-	readonly defaultOptions?: GenerationDefaults
-}
-
-// ============================================================================
-// Embedding Adapter Options
-// ============================================================================
-
-/** OpenAI embedding adapter options */
-export interface OpenAIEmbeddingAdapterOptions {
-	/** OpenAI API key */
-	readonly apiKey: string
-	/** Model to use (default: 'text-embedding-3-small') */
-	readonly model?: string
-	/** Output dimensions (optional, for dimension reduction) */
-	readonly dimensions?: number
-	/** Base URL for API */
-	readonly baseURL?: string
-}
-
-/** Voyage embedding adapter options */
-export interface VoyageEmbeddingAdapterOptions {
-	/** Voyage API key */
-	readonly apiKey: string
-	/** Model to use (default: 'voyage-2') */
-	readonly model?: VoyageEmbeddingModel
-	/** Base URL for API (default: 'https://api.voyageai.com/v1') */
-	readonly baseURL?: string
-	/** Input type for embeddings */
-	readonly inputType?: 'query' | 'document'
-}
-
-/** Voyage embedding model options */
-export type VoyageEmbeddingModel =
-	| 'voyage-3'
-	| 'voyage-3-lite'
-	| 'voyage-code-3'
-	| 'voyage-finance-2'
-	| 'voyage-law-2'
-	| 'voyage-multilingual-2'
-	| 'voyage-2'
-	| 'voyage-code-2'
-	| (string & {})
-
-/**
- * Anthropic embedding adapter options (placeholder).
- *
- * NOTE: Anthropic does not currently offer a public embedding API.
- * Voyage AI (https://www.voyageai.com/) is the recommended alternative,
- * as it has a partnership relationship with Anthropic.
- *
- * Use `VoyageEmbeddingAdapterOptions` instead for production embeddings.
- * This interface is reserved for future use if Anthropic releases an embedding API.
- */
-export interface AnthropicEmbeddingAdapterOptions {
-	/** Anthropic API key */
-	readonly apiKey: string
-	/** Model to use (reserved for future API) */
-	readonly model?: string
-	/** Base URL for API */
-	readonly baseURL?: string
-}
-
-/**
- * Batched embedding adapter options.
- * Wraps an embedding adapter with automatic batching.
- */
-export interface BatchedEmbeddingAdapterOptions {
-	/** The base embedding adapter to wrap */
-	readonly adapter: EmbeddingAdapterInterface
-	/** Maximum batch size (default: 100) */
-	readonly batchSize?: number
-	/** Delay before flushing batch in ms (default: 50) */
-	readonly delayMs?: number
-	/** Deduplicate identical texts within a batch (default: true) */
-	readonly deduplicate?: boolean
-}
-
-/**
- * Cached embedding adapter options.
- * Wraps an embedding adapter with caching support.
- */
-export interface CachedEmbeddingAdapterOptions {
-	/** The base embedding adapter to wrap */
-	readonly adapter: EmbeddingAdapterInterface
-	/** Cache storage */
-	readonly cache: Map<string, CachedEmbedding>
-	/** Time-to-live in ms (optional) */
-	readonly ttlMs?: number
-}
-
-/** Cached embedding entry */
-export interface CachedEmbedding {
-	/** The embedding vector */
+/** Stored document with embedding */
+export interface StoredDocument {
+	readonly id: string
+	readonly content: string
 	readonly embedding: Embedding
-	/** Timestamp when cached */
-	readonly cachedAt: number
+	readonly metadata?: DocumentMetadata
+	readonly createdAt: number
+	readonly updatedAt: number
 }
 
 // ============================================================================
-// Ollama Adapter Options (Local Development / Testing)
+// Search Types
+// ============================================================================
+
+/** Metadata filter */
+export type MetadataFilter =
+	| Record<string, unknown>
+	| ((metadata: DocumentMetadata | undefined) => boolean)
+
+/** Similarity function */
+export type SimilarityFunction =
+	| 'cosine'
+	| 'dot'
+	| 'euclidean'
+	| ((a: Embedding, b: Embedding) => number)
+
+/** Similarity search options */
+export interface SimilaritySearchOptions {
+	readonly limit?: number
+	readonly threshold?: number
+	readonly filter?: MetadataFilter
+	readonly includeEmbeddings?: boolean
+	readonly rerank?: boolean
+	readonly rerankTopK?: number
+}
+
+/** Hybrid search options */
+export interface HybridSearchOptions extends SimilaritySearchOptions {
+	readonly vectorWeight?: number
+	readonly keywordWeight?: number
+	readonly keywordMode?: 'exact' | 'fuzzy' | 'prefix'
+}
+
+// ============================================================================
+// Persistence Types
+// ============================================================================
+
+/** Vector store metadata */
+export interface VectorStoreMetadata {
+	readonly modelId: string
+	readonly dimension: number
+	readonly documentCount: number
+	readonly createdAt: number
+	readonly updatedAt: number
+}
+
+/** Memory info */
+export interface MemoryInfo {
+	readonly documentCount: number
+	readonly estimatedBytes: number
+	readonly dimensionCount: number
+}
+
+/** Exported vector store */
+export interface ExportedVectorStore {
+	readonly version: number
+	readonly exportedAt: number
+	readonly metadata: VectorStoreMetadata
+	readonly documents: readonly StoredDocument[]
+}
+
+/** Load options */
+export interface LoadOptions {
+	readonly force?: boolean
+}
+
+// ============================================================================
+// Subscription Interfaces
+// ============================================================================
+
+/** VectorStore subscription methods */
+export interface VectorStoreSubscriptions {
+	onDocumentAdded(callback: (doc: StoredDocument) => void): Unsubscribe
+	onDocumentUpdated(callback: (doc: StoredDocument) => void): Unsubscribe
+	onDocumentRemoved(callback: (id: string) => void): Unsubscribe
+}
+
+// ============================================================================
+// Options Interfaces
 // ============================================================================
 
 /**
- * Ollama provider adapter options.
+ * VectorStore creation options.
  *
- * Ollama is the recommended way to test adapters during development
- * without incurring API costs. It runs models locally.
- *
- * @see https://ollama.ai/
+ * All adapters are opt-in. Nothing is enabled by default.
+ * The embedding adapter is the required first parameter to createVectorStore().
  */
-export interface OllamaProviderAdapterOptions {
-	/** Base URL for Ollama API (default: 'http://localhost:11434') */
-	readonly baseURL?: string
-	/** Model to use (e.g., 'llama2', 'mistral', 'codellama') */
-	readonly model: string
-	/** Default generation options */
-	readonly defaultOptions?: GenerationDefaults
-	/** Keep model loaded in memory (default: true) */
-	readonly keepAlive?: boolean | string
-	/** Request timeout in ms (default: 120000) */
-	readonly timeout?: number
-}
+export interface VectorStoreOptions extends SubscriptionToHook<VectorStoreSubscriptions> {
+	// Persistence (opt-in - stores in memory if not provided)
+	readonly persistence?: VectorStorePersistenceAdapterInterface
 
-/**
- * Ollama embedding adapter options.
- *
- * Ollama supports local embedding generation for development/testing.
- */
-export interface OllamaEmbeddingAdapterOptions {
-	/** Base URL for Ollama API (default: 'http://localhost:11434') */
-	readonly baseURL?: string
-	/** Model to use for embeddings (e.g., 'nomic-embed-text', 'mxbai-embed-large') */
-	readonly model: string
-	/** Request timeout in ms (default: 60000) */
-	readonly timeout?: number
-}
+	// Transform (opt-in)
+	readonly similarity?: SimilarityAdapterInterface
 
-/** Common Ollama embedding models */
-export type OllamaEmbeddingModel =
-	| 'nomic-embed-text'
-	| 'mxbai-embed-large'
-	| 'all-minilm'
-	| 'snowflake-arctic-embed'
-	| (string & {})
+	// Policy (opt-in)
+	readonly retry?: RetryAdapterInterface
+	readonly rateLimit?: RateLimitAdapterInterface
 
-/** Common Ollama chat models */
-export type OllamaChatModel =
-	| 'llama2'
-	| 'llama2:13b'
-	| 'llama2:70b'
-	| 'llama3'
-	| 'llama3:8b'
-	| 'llama3:70b'
-	| 'mistral'
-	| 'mixtral'
-	| 'codellama'
-	| 'deepseek-coder'
-	| 'phi'
-	| 'qwen'
-	| 'gemma'
-	| 'gemma2'
-	| (string & {})
+	// Enhancement (opt-in)
+	readonly cache?: EmbeddingCacheAdapterInterface
+	readonly batch?: BatchAdapterInterface
+	readonly reranker?: RerankerAdapterInterface
 
-// ============================================================================
-// Wrapper Adapter Options
-// ============================================================================
-
-/**
- * Retryable provider adapter options.
- * Used to wrap a base provider with retry logic.
- */
-export interface RetryableProviderAdapterOptions {
-	/** The base provider adapter to wrap */
-	readonly adapter: ProviderAdapterInterface
-	/** Retry options */
-	readonly retry?: RetryOptions
-}
-
-// ============================================================================
-// Policy Adapter Options
-// ============================================================================
-
-/**
- * Exponential retry adapter options.
- * Creates a RetryAdapterInterface with exponential backoff.
- */
-export interface ExponentialRetryAdapterOptions {
-	/** Maximum number of retry attempts (default: 3) */
-	readonly maxAttempts?: number
-	/** Initial delay in ms (default: 1000) */
-	readonly initialDelayMs?: number
-	/** Maximum delay in ms (default: 30000) */
-	readonly maxDelayMs?: number
-	/** Exponential backoff multiplier (default: 2) */
-	readonly backoffMultiplier?: number
-	/** Add jitter to delays (default: true) */
-	readonly jitter?: boolean
-	/** Error codes that should trigger retry */
-	readonly retryableCodes?: readonly AdapterErrorCode[]
-	/** Called before each retry attempt */
-	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
-}
-
-/**
- * Linear retry adapter options.
- * Creates a RetryAdapterInterface with fixed delays.
- */
-export interface LinearRetryAdapterOptions {
-	/** Maximum number of retry attempts (default: 3) */
-	readonly maxAttempts?: number
-	/** Fixed delay in ms (default: 1000) */
-	readonly delayMs?: number
-	/** Error codes that should trigger retry */
-	readonly retryableCodes?: readonly AdapterErrorCode[]
-	/** Called before each retry attempt */
-	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
-}
-
-/**
- * Retry options for wrapper functions like withRetry().
- * Used by retry wrapper utilities.
- */
-export interface RetryOptions {
-	/** Maximum number of retry attempts (default: 3) */
-	readonly maxRetries?: number
-	/** Initial delay in ms (default: 1000) */
-	readonly initialDelayMs?: number
-	/** Maximum delay in ms (default: 30000) */
-	readonly maxDelayMs?: number
-	/** Exponential backoff multiplier (default: 2) */
-	readonly backoffMultiplier?: number
-	/** Add jitter to delays (default: true) */
-	readonly jitter?: boolean
-	/** Error codes that should trigger retry */
-	readonly retryableCodes?: readonly AdapterErrorCode[]
-	/** Custom function to determine if error is retryable */
-	readonly shouldRetry?: (error: unknown, attempt: number) => boolean
-	/** Called before each retry attempt */
-	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
-}
-
-// ============================================================================
-// Rate Limiter Types (Helper for Provider Adapters)
-// ============================================================================
-
-/**
- * Rate limiter interface for internal use by provider adapters.
- * This is a simpler interface than RateLimitAdapterInterface from core.
- */
-export interface RateLimiterInterface {
-	/** Acquire a request slot, waits if none available */
-	acquire(): Promise<void>
-	/** Release a request slot */
-	release(): void
-	/** Get current rate limiter state */
-	getState(): RateLimiterState
-	/** Dynamically adjust rate limit */
-	setLimit(requestsPerMinute: number): void
-}
-
-/** Rate limiter state */
-export interface RateLimiterState {
-	readonly activeRequests: number
-	readonly maxConcurrent: number
-	readonly requestsInWindow: number
-	readonly requestsPerMinute: number
-	readonly windowResetIn: number
-}
-
-/** Rate limiter options */
-export interface RateLimiterOptions {
-	readonly requestsPerMinute?: number
-	readonly maxConcurrent?: number
-	readonly windowMs?: number
-}
-
-/**
- * Token bucket rate limit adapter options.
- * Creates a RateLimitAdapterInterface using token bucket algorithm.
- */
-export interface TokenBucketRateLimitAdapterOptions {
-	/** Maximum requests per minute (default: 60) */
-	readonly requestsPerMinute?: number
-	/** Maximum concurrent requests (default: 10) */
-	readonly maxConcurrent?: number
-	/** Burst size - tokens added per refill (default: 10) */
-	readonly burstSize?: number
-}
-
-/**
- * Sliding window rate limit adapter options.
- * Creates a RateLimitAdapterInterface using sliding window algorithm.
- */
-export interface SlidingWindowRateLimitAdapterOptions {
-	/** Maximum requests per minute (default: 60) */
-	readonly requestsPerMinute?: number
-	/** Window size in ms (default: 60000) */
-	readonly windowMs?: number
-}
-
-// ============================================================================
-// Enhancement Adapter Options
-// ============================================================================
-
-/**
- * LRU cache adapter options.
- * Creates an EmbeddingCacheAdapterInterface with LRU eviction.
- */
-export interface LRUCacheAdapterOptions {
-	/** Maximum number of entries (default: 1000) */
-	readonly maxSize?: number
-	/** Time-to-live in ms (default: 3600000 = 1 hour) */
-	readonly ttlMs?: number
-	/** Callback when entry is evicted */
-	readonly onEvict?: (text: string, embedding: Embedding) => void
-}
-
-/**
- * TTL cache adapter options.
- * Creates an EmbeddingCacheAdapterInterface with TTL-only expiration.
- */
-export interface TTLCacheAdapterOptions {
-	/** Time-to-live in ms (default: 3600000 = 1 hour) */
-	readonly ttlMs?: number
-}
-
-/**
- * IndexedDB cache adapter options.
- * Creates a persistent EmbeddingCacheAdapterInterface using IndexedDB.
- */
-export interface IndexedDBCacheAdapterOptions {
-	/** Database access interface */
-	readonly database: MinimalDatabaseAccess
-	/** Store name for cache entries (default: 'embedding_cache') */
-	readonly storeName?: string
-	/** Time-to-live in ms (default: 604800000 = 7 days) */
-	readonly ttlMs?: number
-}
-
-/**
- * Batch adapter options.
- * Creates a BatchAdapterInterface with configurable settings.
- */
-export interface BatchAdapterOptions {
-	/** Maximum batch size (default: 100) */
-	readonly batchSize?: number
-	/** Delay between batches in ms (default: 50) */
-	readonly delayMs?: number
-	/** Deduplicate identical texts (default: true) */
-	readonly deduplicate?: boolean
-}
-
-/**
- * Cohere reranker adapter options.
- * Creates a RerankerAdapterInterface using Cohere API.
- */
-export interface CohereRerankerAdapterOptions {
-	/** Cohere API key */
-	readonly apiKey: string
-	/** Model to use (default: 'rerank-english-v3.0') */
-	readonly model?: string
-	/** Base URL for API (default: 'https://api.cohere.ai/v1') */
-	readonly baseURL?: string
-}
-
-/**
- * Cross-encoder reranker adapter options.
- * Creates a RerankerAdapterInterface using a local cross-encoder model.
- */
-export interface CrossEncoderRerankerAdapterOptions {
-	/** Model identifier */
-	readonly model: string
-	/** Model path or URL */
-	readonly modelPath?: string
-}
-
-// ============================================================================
-// Model Multipliers (Token counting is owned by @mikesaintsg/inference)
-// ============================================================================
-
-/**
- * Model-specific token estimation multipliers.
- *
- * Token counting logic is owned by `@mikesaintsg/inference`.
- * This package provides model-specific multipliers as constants
- * that can be passed to inference's token counter for improved accuracy.
- */
-export interface ModelTokenMultipliers {
-	/** OpenAI models typically use ~4 chars/token */
-	readonly 'gpt-4': number
-	readonly 'gpt-4o': number
-	readonly 'gpt-3.5-turbo': number
-	/** Anthropic models may differ slightly */
-	readonly 'claude-3-5-sonnet-20241022': number
-	readonly 'claude-3-opus-20240229': number
-	readonly 'claude-3-sonnet-20240229': number
-	readonly 'claude-3-haiku-20240307': number
-	/** Ollama models vary by base model */
-	readonly 'llama2': number
-	readonly 'llama3': number
-	readonly 'mistral': number
-	/** Index signature for other models */
-	readonly [model: string]: number
-}
-
-// ============================================================================
-// Tool Format Adapter Options
-// ============================================================================
-
-/** OpenAI tool choice type */
-export type OpenAIToolChoice =
-	| 'auto'
-	| 'none'
-	| 'required'
-	| { readonly type: 'function'; readonly function: { readonly name: string } }
-
-/** OpenAI tool format adapter options */
-export interface OpenAIToolFormatAdapterOptions {
-	/** Tool choice behavior */
-	readonly toolChoice?: OpenAIToolChoice
-}
-
-/** Anthropic tool choice type */
-export type AnthropicToolChoice =
-	| 'auto'
-	| 'any'
-	| { readonly type: 'tool'; readonly name: string }
-
-/** Anthropic tool format adapter options */
-export interface AnthropicToolFormatAdapterOptions {
-	/** Tool choice behavior */
-	readonly toolChoice?: AnthropicToolChoice
-}
-
-// ============================================================================
-// Session Persistence Options
-// ============================================================================
-
-/** IndexedDB session persistence options */
-export interface IndexedDBSessionPersistenceOptions {
-	/** Database name (default: 'mikesaintsg-sessions') */
-	readonly databaseName?: string
-	/** Store name (default: 'sessions') */
-	readonly storeName?: string
-	/** Time-to-live for sessions in ms (default: 7 days) */
-	readonly ttlMs?: number
-}
-
-// ============================================================================
-// VectorStore Persistence Options
-// ============================================================================
-
-/** IndexedDB vector persistence options */
-export interface IndexedDBVectorPersistenceOptions {
-	/** Database access interface */
-	readonly database: MinimalDatabaseAccess
-	/** Documents store name (default: 'documents') */
-	readonly documentsStore?: string
-	/** Metadata store name (default: 'metadata') */
-	readonly metadataStore?: string
-}
-
-/** OPFS vector persistence options */
-export interface OPFSVectorPersistenceOptions {
-	/** Directory access interface */
-	readonly directory: MinimalDirectoryAccess
-	/** Chunk size for large files (default: 100) */
-	readonly chunkSize?: number
-}
-
-/** HTTP vector persistence options */
-export interface HTTPVectorPersistenceOptions {
-	/** Base URL for API */
-	readonly baseURL: string
-	/** Additional headers */
-	readonly headers?: Readonly<Record<string, string>>
-	/** Request timeout in ms (default: 30000) */
-	readonly timeout?: number
+	// Configuration
+	readonly autoSave?: boolean
 }
 
 // ============================================================================
 // Error Types
 // ============================================================================
 
-/** Adapter error codes */
-export type AdapterErrorCode =
-	| 'AUTHENTICATION_ERROR'
-	| 'RATE_LIMIT_ERROR'
-	| 'QUOTA_EXCEEDED_ERROR'
-	| 'NETWORK_ERROR'
-	| 'TIMEOUT_ERROR'
-	| 'INVALID_REQUEST_ERROR'
-	| 'MODEL_NOT_FOUND_ERROR'
-	| 'CONTEXT_LENGTH_ERROR'
-	| 'CONTENT_FILTER_ERROR'
-	| 'SERVICE_ERROR'
-	| 'UNKNOWN_ERROR'
+/** VectorStore error codes */
+export type VectorStoreErrorCode =
+	| 'NOT_FOUND'
+	| 'MODEL_MISMATCH'
+	| 'DIMENSION_MISMATCH'
+	| 'PERSISTENCE_ERROR'
+	| 'EMBEDDING_ERROR'
+	| 'NOT_LOADED'
+	| 'UNKNOWN'
 
-/** Adapter error data */
-export interface AdapterErrorData {
-	/** Error code */
-	readonly code: AdapterErrorCode
-	/** Provider-specific error code */
-	readonly providerCode?: string
-	/** Retry after (for rate limits) in ms */
-	readonly retryAfter?: number
-	/** Additional context */
-	readonly context?: Readonly<Record<string, unknown>>
+/** VectorStore error data interface */
+export interface VectorStoreErrorData extends PackageErrorData<VectorStoreErrorCode> {
+	readonly documentId?: string
+}
+
+// ============================================================================
+// Behavioral Interfaces
+// ============================================================================
+
+/**
+ * VectorStore interface - main entry point.
+ *
+ * Provides document storage, similarity search, and persistence.
+ */
+export interface VectorStoreInterface extends VectorStoreSubscriptions {
+	// ---- Document Operations ----
+
+	/**
+	 * Add or update document(s).
+	 * @param doc - Single document or array
+	 */
+	upsertDocument(doc: Document | readonly Document[]): Promise<void>
+
+	/**
+	 * Get document by ID.
+	 * @param id - Document ID
+	 */
+	getDocument(id: string): Promise<StoredDocument | undefined>
+
+	/**
+	 * Get documents by IDs.
+	 * @param ids - Document IDs
+	 */
+	getDocument(ids: readonly string[]): Promise<readonly (StoredDocument | undefined)[]>
+
+	/**
+	 * Remove document(s).
+	 * @param id - Single ID or array
+	 */
+	removeDocument(id: string | readonly string[]): Promise<void>
+
+	/**
+	 * Check if document exists.
+	 * @param id - Document ID
+	 */
+	hasDocument(id: string): Promise<boolean>
+
+	/** Get all documents */
+	all(): Promise<readonly StoredDocument[]>
+
+	/** Get document count */
+	count(): Promise<number>
+
+	/** Clear all documents */
+	clear(): Promise<void>
+
+	// ---- Search Operations ----
+
+	/**
+	 * Similarity search.
+	 * @param query - Query text
+	 * @param options - Search options
+	 */
+	similaritySearch(query: string, options?: SimilaritySearchOptions): Promise<readonly ScoredResult[]>
+
+	/**
+	 * Hybrid search (vector + keyword).
+	 * @param query - Query text
+	 * @param options - Search options
+	 */
+	hybridSearch(query: string, options?: HybridSearchOptions): Promise<readonly ScoredResult[]>
+
+	// ---- Metadata Operations ----
+
+	/**
+	 * Update document metadata only.
+	 * @param id - Document ID
+	 * @param metadata - New metadata
+	 */
+	updateMetadata(id: string, metadata: DocumentMetadata): Promise<void>
+
+	// ---- Persistence Operations ----
+
+	/**
+	 * Load from persistence.
+	 * @param options - Load options
+	 */
+	load(options?: LoadOptions): Promise<void>
+
+	/** Save to persistence */
+	save(): Promise<void>
+
+	/** Reload from persistence */
+	reload(): Promise<void>
+
+	/** Re-embed all documents */
+	reindex(): Promise<void>
+
+	/** Check if loaded */
+	isLoaded(): boolean
+
+	// ---- Info Methods ----
+
+	/** Get embedding model ID */
+	getModelId(): string
+
+	/** Get memory usage info */
+	getMemoryInfo(): MemoryInfo
+
+	// ---- Export/Import ----
+
+	/** Export data */
+	export(): Promise<ExportedVectorStore>
+
+	/**
+	 * Import data.
+	 * @param data - Data to import
+	 */
+	import(data: ExportedVectorStore): Promise<void>
+
+	// ---- Lifecycle ----
+
+	/** Cleanup resources */
+	destroy(): void
 }
 
 // ============================================================================
 // Factory Function Types
 // ============================================================================
 
-/** Factory function for OpenAI provider adapter */
-export type CreateOpenAIProviderAdapter = (
-	options: OpenAIProviderAdapterOptions
-) => ProviderAdapterInterface
+/**
+ * Factory function for creating vector store.
+ *
+ * @param embedding - Required embedding adapter
+ * @param options - Optional adapters and configuration (all opt-in)
+ */
+export type CreateVectorStore = (
+	embedding: EmbeddingAdapterInterface,
+	options?: VectorStoreOptions
+) => Promise<VectorStoreInterface>
 
-/** Factory function for Anthropic provider adapter */
-export type CreateAnthropicProviderAdapter = (
-	options: AnthropicProviderAdapterOptions
-) => ProviderAdapterInterface
+/** Factory function for in-memory persistence adapter */
+export type CreateInMemoryPersistenceAdapter = () => VectorStorePersistenceAdapterInterface
 
-/** Factory function for OpenAI embedding adapter */
-export type CreateOpenAIEmbeddingAdapter = (
-	options: OpenAIEmbeddingAdapterOptions
-) => EmbeddingAdapterInterface
+/** Factory function for IndexedDB persistence adapter */
+export interface IndexedDBPersistenceAdapterOptions {
+	readonly database: MinimalDatabaseAccess<StoredDocument>
+	readonly documentsStore?: string
+	readonly metadataStore?: string
+}
 
-/** Factory function for Voyage embedding adapter */
-export type CreateVoyageEmbeddingAdapter = (
-	options: VoyageEmbeddingAdapterOptions
-) => EmbeddingAdapterInterface
-
-/** Factory function for OpenAI tool format adapter */
-export type CreateOpenAIToolFormatAdapter = (
-	options?: OpenAIToolFormatAdapterOptions
-) => ToolFormatAdapterInterface
-
-/** Factory function for Anthropic tool format adapter */
-export type CreateAnthropicToolFormatAdapter = (
-	options?: AnthropicToolFormatAdapterOptions
-) => ToolFormatAdapterInterface
-
-/** Factory function for tool call bridge */
-export type CreateToolCallBridge = (
-	options: ToolCallBridgeOptions
-) => ToolCallBridgeInterface
-
-/** Factory function for retrieval tool */
-export type CreateRetrievalTool = (
-	options: RetrievalToolOptions
-) => RetrievalToolInterface
-
-/** Factory function for session persistence */
-export type CreateIndexedDBSessionPersistence = (
-	options?: IndexedDBSessionPersistenceOptions
-) => SessionPersistenceInterface
-
-/** Factory function for IndexedDB vector persistence */
-export type CreateIndexedDBVectorPersistence = (
-	options: IndexedDBVectorPersistenceOptions
+export type CreateIndexedDBPersistenceAdapter = (
+	options: IndexedDBPersistenceAdapterOptions
 ) => VectorStorePersistenceAdapterInterface
 
-/** Factory function for HTTP vector persistence */
-export type CreateHTTPVectorPersistence = (
-	options: HTTPVectorPersistenceOptions
+/** Factory function for OPFS persistence adapter */
+export interface OPFSPersistenceAdapterOptions {
+	readonly directory: MinimalDirectoryAccess
+	readonly chunkSize?: number
+}
+
+export type CreateOPFSPersistenceAdapter = (
+	options: OPFSPersistenceAdapterOptions
 ) => VectorStorePersistenceAdapterInterface
 
-/** Factory function for Ollama provider adapter */
-export type CreateOllamaProviderAdapter = (
-	options: OllamaProviderAdapterOptions
-) => ProviderAdapterInterface
-
-/** Factory function for Ollama embedding adapter */
-export type CreateOllamaEmbeddingAdapter = (
-	options: OllamaEmbeddingAdapterOptions
-) => EmbeddingAdapterInterface
-
-// ============================================================================
-// Policy Adapter Factory Types
-// ============================================================================
-
-/** Factory for exponential retry adapter */
-export type CreateExponentialRetryAdapter = (
-	options?: ExponentialRetryAdapterOptions
-) => RetryAdapterInterface
-
-/** Factory for linear retry adapter */
-export type CreateLinearRetryAdapter = (
-	options?: LinearRetryAdapterOptions
-) => RetryAdapterInterface
-
-/** Factory for token bucket rate limit adapter */
-export type CreateTokenBucketRateLimitAdapter = (
-	options?: TokenBucketRateLimitAdapterOptions
-) => RateLimitAdapterInterface
-
-/** Factory for sliding window rate limit adapter */
-export type CreateSlidingWindowRateLimitAdapter = (
-	options?: SlidingWindowRateLimitAdapterOptions
-) => RateLimitAdapterInterface
-
-// ============================================================================
-// Enhancement Adapter Factory Types
-// ============================================================================
-
-/** Factory for LRU cache adapter */
-export type CreateLRUCacheAdapter = (
-	options?: LRUCacheAdapterOptions
-) => EmbeddingCacheAdapterInterface
-
-/** Factory for TTL cache adapter */
-export type CreateTTLCacheAdapter = (
-	options?: TTLCacheAdapterOptions
-) => EmbeddingCacheAdapterInterface
-
-/** Factory for IndexedDB cache adapter */
-export type CreateIndexedDBCacheAdapter = (
-	options: IndexedDBCacheAdapterOptions
-) => EmbeddingCacheAdapterInterface
-
-/** Factory for batch adapter */
-export type CreateBatchAdapter = (
-	options?: BatchAdapterOptions
-) => BatchAdapterInterface
-
-/** Factory for Cohere reranker adapter */
-export type CreateCohereRerankerAdapter = (
-	options: CohereRerankerAdapterOptions
-) => RerankerAdapterInterface
-
-/** Factory for cross-encoder reranker adapter */
-export type CreateCrossEncoderRerankerAdapter = (
-	options: CrossEncoderRerankerAdapterOptions
-) => RerankerAdapterInterface
-
-// ============================================================================
-// Transform Adapter Factory Types
-// ============================================================================
-
-/** Factory for cosine similarity adapter */
-export type CreateCosineSimilarityAdapter = () => SimilarityAdapterInterface
-
-/** Factory for dot product similarity adapter */
-export type CreateDotSimilarityAdapter = () => SimilarityAdapterInterface
-
-/** Factory for euclidean similarity adapter */
-export type CreateEuclideanSimilarityAdapter = () => SimilarityAdapterInterface
-
-// ============================================================================
-// Context Builder Adapter Factory Types
-// ============================================================================
-
-/** Deduplication adapter options */
-export interface DeduplicationAdapterOptions {
-	/** Strategy for selecting which frame to keep */
-	readonly strategy?: DeduplicationStrategy
+/** Factory function for HTTP persistence adapter */
+export interface HTTPPersistenceAdapterOptions {
+	readonly baseURL: string
+	readonly headers?: Readonly<Record<string, string>>
 }
 
-/** Factory for deduplication adapter */
-export type CreateDeduplicationAdapter = (
-	options?: DeduplicationAdapterOptions
-) => DeduplicationAdapterInterface
-
-/** Truncation adapter options */
-export interface TruncationAdapterOptions {
-	/** Whether to preserve system frames */
-	readonly preserveSystem?: boolean
-}
-
-/** Factory for priority-based truncation adapter */
-export type CreatePriorityTruncationAdapter = (
-	options?: TruncationAdapterOptions
-) => TruncationAdapterInterface
-
-/** Factory for FIFO truncation adapter (oldest first) */
-export type CreateFIFOTruncationAdapter = (
-	options?: TruncationAdapterOptions
-) => TruncationAdapterInterface
-
-/** Factory for LIFO truncation adapter (newest first) */
-export type CreateLIFOTruncationAdapter = (
-	options?: TruncationAdapterOptions
-) => TruncationAdapterInterface
-
-/** Factory for score-based truncation adapter */
-export type CreateScoreTruncationAdapter = (
-	options?: TruncationAdapterOptions
-) => TruncationAdapterInterface
-
-/** Priority weights configuration */
-export type PriorityWeights = Partial<Record<FramePriority, number>>
-
-/** Priority adapter options */
-export interface PriorityAdapterOptions {
-	/** Custom weights for each priority level */
-	readonly weights?: PriorityWeights
-}
-
-/** Factory for priority adapter */
-export type CreatePriorityAdapter = (
-	options?: PriorityAdapterOptions
-) => PriorityAdapterInterface
-
-// ============================================================================
-// API Response Types (Internal to Adapters)
-// ============================================================================
-
-/** OpenAI chat completion chunk */
-export interface OpenAIChatCompletionChunk {
-	readonly id: string
-	readonly object: 'chat.completion.chunk'
-	readonly created: number
-	readonly model: string
-	readonly choices: readonly OpenAIChatCompletionChunkChoice[]
-}
-
-/** OpenAI chat completion chunk choice */
-export interface OpenAIChatCompletionChunkChoice {
-	readonly index: number
-	readonly delta: OpenAIChatCompletionDelta
-	readonly finish_reason: string | null
-}
-
-/** OpenAI chat completion delta */
-export interface OpenAIChatCompletionDelta {
-	readonly role?: string
-	readonly content?: string
-	readonly tool_calls?: readonly OpenAIToolCallDelta[]
-}
-
-/** OpenAI tool call delta */
-export interface OpenAIToolCallDelta {
-	readonly index: number
-	readonly id?: string
-	readonly type?: 'function'
-	readonly function?: {
-		readonly name?: string
-		readonly arguments?: string
-	}
-}
-
-/** OpenAI embedding response */
-export interface OpenAIEmbeddingResponse {
-	readonly object: 'list'
-	readonly data: readonly OpenAIEmbeddingData[]
-	readonly model: string
-	readonly usage: {
-		readonly prompt_tokens: number
-		readonly total_tokens: number
-	}
-}
-
-/** OpenAI embedding data */
-export interface OpenAIEmbeddingData {
-	readonly object: 'embedding'
-	readonly embedding: readonly number[]
-	readonly index: number
-}
-
-/** Voyage embedding response */
-export interface VoyageEmbeddingResponse {
-	readonly object: 'list'
-	readonly data: readonly VoyageEmbeddingData[]
-	readonly model: string
-	readonly usage: {
-		readonly total_tokens: number
-	}
-}
-
-/** Voyage embedding data */
-export interface VoyageEmbeddingData {
-	readonly object: 'embedding'
-	readonly embedding: readonly number[]
-	readonly index: number
-}
-
-/** Anthropic message stream event */
-export interface AnthropicMessageStreamEvent {
-	readonly type: string
-	readonly index?: number
-	readonly content_block?: AnthropicContentBlock
-	readonly delta?: AnthropicDelta
-}
-
-/** Anthropic content block */
-export interface AnthropicContentBlock {
-	readonly type: 'text' | 'tool_use'
-	readonly text?: string
-	readonly id?: string
-	readonly name?: string
-	readonly input?: unknown
-}
-
-/** Anthropic delta */
-export interface AnthropicDelta {
-	readonly type: string
-	readonly text?: string
-	readonly partial_json?: string
-}
-
-// ============================================================================
-// Ollama API Response Types (Internal to Adapters)
-// ============================================================================
-
-/** Ollama chat completion request */
-export interface OllamaChatRequest {
-	readonly model: string
-	readonly messages: readonly OllamaChatMessage[]
-	readonly stream?: boolean
-	readonly format?: 'json'
-	readonly options?: OllamaModelOptions
-	readonly keep_alive?: boolean | string
-	readonly tools?: readonly OllamaTool[]
-}
-
-/** Ollama chat message */
-export interface OllamaChatMessage {
-	readonly role: 'system' | 'user' | 'assistant' | 'tool'
-	readonly content: string
-	readonly images?: readonly string[]
-	readonly tool_calls?: readonly OllamaToolCall[]
-}
-
-/** Ollama model options */
-export interface OllamaModelOptions {
-	readonly temperature?: number
-	readonly top_p?: number
-	readonly top_k?: number
-	readonly num_predict?: number
-	readonly stop?: readonly string[]
-	readonly seed?: number
-}
-
-/** Ollama chat completion response (non-streaming) */
-export interface OllamaChatResponse {
-	readonly model: string
-	readonly created_at: string
-	readonly message: OllamaChatMessage
-	readonly done: boolean
-	readonly total_duration?: number
-	readonly load_duration?: number
-	readonly prompt_eval_count?: number
-	readonly prompt_eval_duration?: number
-	readonly eval_count?: number
-	readonly eval_duration?: number
-}
-
-/** Ollama chat completion chunk (streaming) */
-export interface OllamaChatStreamChunk {
-	readonly model: string
-	readonly created_at: string
-	readonly message: OllamaChatMessage
-	readonly done: boolean
-	readonly done_reason?: 'stop' | 'length' | 'load'
-	readonly total_duration?: number
-	readonly load_duration?: number
-	readonly prompt_eval_count?: number
-	readonly prompt_eval_duration?: number
-	readonly eval_count?: number
-	readonly eval_duration?: number
-}
-
-/** Ollama tool definition */
-export interface OllamaTool {
-	readonly type: 'function'
-	readonly function: OllamaToolFunction
-}
-
-/** Ollama tool function definition */
-export interface OllamaToolFunction {
-	readonly name: string
-	readonly description: string
-	readonly parameters: unknown
-}
-
-/** Ollama tool call from response */
-export interface OllamaToolCall {
-	readonly id?: string
-	readonly type?: 'function'
-	readonly function: {
-		readonly name: string
-		readonly arguments: Readonly<Record<string, unknown>>
-	}
-}
-
-/** Ollama embedding request */
-export interface OllamaEmbeddingRequest {
-	readonly model: string
-	readonly input: string | readonly string[]
-	readonly truncate?: boolean
-	readonly keep_alive?: boolean | string
-}
-
-/** Ollama embedding response */
-export interface OllamaEmbeddingResponse {
-	readonly model: string
-	readonly embeddings: readonly (readonly number[])[]
-	readonly total_duration?: number
-	readonly load_duration?: number
-	readonly prompt_eval_count?: number
-}
-
-/** Ollama model info (from /api/show) */
-export interface OllamaModelInfo {
-	readonly modelfile: string
-	readonly parameters: string
-	readonly template: string
-	readonly details: OllamaModelDetails
-}
-
-/** Ollama model details */
-export interface OllamaModelDetails {
-	readonly parent_model: string
-	readonly format: string
-	readonly family: string
-	readonly families: readonly string[]
-	readonly parameter_size: string
-	readonly quantization_level: string
-}
-
-/** Ollama list models response */
-export interface OllamaListModelsResponse {
-	readonly models: readonly OllamaModelSummary[]
-}
-
-/** Ollama model summary */
-export interface OllamaModelSummary {
-	readonly name: string
-	readonly model: string
-	readonly modified_at: string
-	readonly size: number
-	readonly digest: string
-	readonly details: OllamaModelDetails
-}
-
-// ============================================================================
-// SSE Parsing Types (Shared across providers)
-// ============================================================================
-
-/**
- * SSE event from parsing.
- * Used by helpers/sse.ts for shared SSE parsing logic.
- */
-export interface SSEEvent {
-	readonly event?: string
-	readonly data: string
-	readonly id?: string
-	readonly retry?: number
-}
-
-/**
- * SSE parser options.
- * SSE parsing is shared across OpenAI, Anthropic, and Ollama adapters.
- */
-export interface SSEParserOptions {
-	/** Called for each parsed event */
-	readonly onEvent: (event: SSEEvent) => void
-	/** Called on parse error */
-	readonly onError?: (error: Error) => void
-	/** Called when stream ends */
-	readonly onEnd?: () => void
-}
-
-/**
- * SSE parser interface.
- * Stateful parser that handles chunked SSE data.
- */
-export interface SSEParserInterface {
-	/** Feed data chunk to parser */
-	feed(chunk: string): void
-	/** Signal end of stream */
-	end(): void
-	/** Reset parser state */
-	reset(): void
-}
+export type CreateHTTPPersistenceAdapter = (
+	options: HTTPPersistenceAdapterOptions
+) => VectorStorePersistenceAdapterInterface
