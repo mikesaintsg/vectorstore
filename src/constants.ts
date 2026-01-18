@@ -1,6 +1,6 @@
 /**
  * @mikesaintsg/vectorstore
  *
- * Shared constants for the core library.
+ * Shared constants for the vectorstore library.
  */
 
