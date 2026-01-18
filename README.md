@@ -1,19 +1,22 @@
-# @mikesaintsg/[package-name]
+# @mikesaintsg/vectorstore
 
-> **[One-line description of the package]**
+> **Zero-dependency vector storage and semantic search library for browser and Node.js applications.**
 
-[![npm version](https://img.shields.io/npm/v/@mikesaintsg/[package-name].svg)](https://www.npmjs.com/package/@mikesaintsg/[package-name])
-[![bundle size](https://img.shields.io/bundlephobia/minzip/@mikesaintsg/[package-name])](https://bundlephobia.com/package/@mikesaintsg/[package-name])
-[![license](https://img.shields.io/npm/l/@mikesaintsg/[package-name].svg)](LICENSE)
+[![npm version](https://img.shields.io/npm/v/@mikesaintsg/vectorstore.svg)](https://www.npmjs.com/package/@mikesaintsg/vectorstore)
+[![bundle size](https://img.shields.io/bundlephobia/minzip/@mikesaintsg/vectorstore)](https://bundlephobia.com/package/@mikesaintsg/vectorstore)
+[![license](https://img.shields.io/npm/l/@mikesaintsg/vectorstore.svg)](LICENSE)
 
 ---
 
 ## Features
 
-- ✅ **[Feature 1]** — [Brief description]
-- ✅ **[Feature 2]** — [Brief description]
-- ✅ **[Feature 3]** — [Brief description]
-- ✅ **Zero dependencies** — Built on native [platform] APIs
+- ✅ **In-browser vector storage** — No external vector database required
+- ✅ **Cosine similarity search** — Find semantically similar documents
+- ✅ **Hybrid search** — Combine vector and keyword search
+- ✅ **Embedding adapter pattern** — Use any embedding provider via adapters
+- ✅ **Persistence adapters** — Store vectors in IndexedDB, OPFS, or memory
+- ✅ **Model consistency enforcement** — Detect embedding model mismatches
+- ✅ **Zero dependencies** — Built entirely on native APIs
 - ✅ **TypeScript first** — Full type safety with generics
 - ✅ **Tree-shakeable** — ESM-only, import what you need
 
@@ -22,7 +25,13 @@
 ## Installation
 
 ```bash
-npm install @mikesaintsg/[package-name]
+npm install @mikesaintsg/vectorstore @mikesaintsg/core
+```
+
+For full ecosystem integration:
+
+```bash
+npm install @mikesaintsg/vectorstore @mikesaintsg/core @mikesaintsg/adapters
 ```
 
 ---
@@ -30,33 +39,56 @@ npm install @mikesaintsg/[package-name]
 ## Quick Start
 
 ```ts
-import { create[Main] } from '@mikesaintsg/[package-name]'
+import { createVectorStore } from '@mikesaintsg/vectorstore'
+import { createOpenAIEmbeddingAdapter } from '@mikesaintsg/adapters'
 
-// Create instance
-const [instance] = create[Main]({
-	[option]: [value],
+// 1. Create embedding adapter
+const embedding = createOpenAIEmbeddingAdapter({
+  apiKey: process.env.OPENAI_API_KEY!,
+  model: 'text-embedding-3-small',
 })
 
-// Use the API
-[instance].[method]()
+// 2. Create vector store with required adapter as first parameter
+const store = await createVectorStore(embedding)
 
-// Cleanup when done
-[instance].destroy()
+// 3. Add documents
+await store.upsertDocument([
+  { id: 'doc1', content: 'TypeScript is a typed superset of JavaScript.' },
+  { id: 'doc2', content: 'React is a library for building user interfaces.' },
+  { id: 'doc3', content: 'Node.js is a JavaScript runtime.' },
+])
+
+// 4. Search for similar documents
+const results = await store.similaritySearch('What is TypeScript?', {
+  limit: 3,
+  threshold: 0.7,
+})
+
+for (const result of results) {
+  console.log(`[${result.score.toFixed(2)}] ${result.content}`)
+}
+
+// 5. Cleanup when done
+store.destroy()
 ```
 
 ---
 
 ## Documentation
 
-📚 **[Full API Guide](./guides/[package-name].md)** — Comprehensive documentation with examples
+📚 **[Full API Guide](./guides/vectorstore.md)** — Comprehensive documentation with examples
 
 ### Key Sections
 
-- [Introduction](./guides/[package-name].md#introduction) — Value proposition and use cases
-- [Quick Start](./guides/[package-name].md#quick-start) — Get started in minutes
-- [Core Concepts](./guides/[package-name].md#core-concepts) — Understand the fundamentals
-- [Error Handling](./guides/[package-name].md#error-handling) — Error codes and recovery
-- [API Reference](./guides/[package-name].md#api-reference) — Complete API documentation
+- [Introduction](./guides/vectorstore.md#introduction) — Value proposition and use cases
+- [Quick Start](./guides/vectorstore.md#quick-start) — Get started in minutes
+- [Core Concepts](./guides/vectorstore.md#core-concepts) — Understand documents, embeddings, and search
+- [Embedding Adapters](./guides/vectorstore.md#embedding-adapters) — Configure embedding providers
+- [Similarity Search](./guides/vectorstore.md#similarity-search) — Vector-based semantic search
+- [Hybrid Search](./guides/vectorstore.md#hybrid-search) — Combine vector and keyword search
+- [Persistence Adapters](./guides/vectorstore.md#persistence-adapters) — Store vectors persistently
+- [Error Handling](./guides/vectorstore.md#error-model-and-reliability) — Error codes and recovery
+- [API Reference](./guides/vectorstore.md#api-reference) — Complete API documentation
 
 ---
 
@@ -64,19 +96,52 @@ const [instance] = create[Main]({
 
 ### Factory Functions
 
-| Function                 | Description                     |
-|--------------------------|---------------------------------|
-| `create[Main](options)`  | Create a [main] instance        |
-| `is[Feature]Supported()` | Check if [feature] is supported |
+| Function                              | Description                        |
+|---------------------------------------|------------------------------------|
+| `createVectorStore(embedding, opts?)` | Create a vector store instance     |
 
-### Main Interface
+### VectorStoreInterface
 
-| Method                | Description          |
-|-----------------------|----------------------|
-| `[method1]()`         | [Description]        |
-| `[method2](param)`    | [Description]        |
-| `on[Event](callback)` | Subscribe to [event] |
-| `destroy()`           | Cleanup resources    |
+| Method                                     | Description                         |
+|--------------------------------------------|-------------------------------------|
+| `upsertDocument(doc)`                      | Add or update document(s)           |
+| `getDocument(id)`                          | Get document by ID                  |
+| `removeDocument(id)`                       | Remove document(s)                  |
+| `hasDocument(id)`                          | Check if document exists            |
+| `all()`                                    | Get all documents                   |
+| `count()`                                  | Get document count                  |
+| `clear()`                                  | Remove all documents                |
+| `similaritySearch(query, opts?)`           | Vector similarity search            |
+| `hybridSearch(query, opts?)`               | Hybrid vector + keyword search      |
+| `updateMetadata(id, metadata)`             | Update document metadata            |
+| `load(opts?)`                              | Load from persistence               |
+| `save()`                                   | Save to persistence                 |
+| `reload()`                                 | Reload from persistence             |
+| `reindex()`                                | Re-embed all documents              |
+| `isLoaded()`                               | Check if loaded                     |
+| `getModelId()`                             | Get embedding model ID              |
+| `getMemoryInfo()`                          | Get memory usage info               |
+| `export()`                                 | Export store data                   |
+| `import(data)`                             | Import store data                   |
+| `onDocumentAdded(callback)`                | Subscribe to document additions     |
+| `onDocumentUpdated(callback)`              | Subscribe to document updates       |
+| `onDocumentRemoved(callback)`              | Subscribe to document removals      |
+| `destroy()`                                | Cleanup resources                   |
+
+### Helper Functions
+
+| Function                                  | Description                         |
+|-------------------------------------------|-------------------------------------|
+| `cosineSimilarity(a, b)`                  | Compute cosine similarity           |
+| `dotProductSimilarity(a, b)`              | Compute dot product                 |
+| `euclideanSimilarity(a, b)`               | Compute euclidean similarity        |
+| `normalizeVector(vector)`                 | Normalize to unit length            |
+| `magnitudeVector(vector)`                 | Compute vector magnitude (L2 norm)  |
+| `computeKeywordScore(query, content, mode)` | Compute keyword match score       |
+| `tokenize(text)`                          | Tokenize text to terms              |
+| `estimateDocumentBytes(doc)`              | Estimate document memory usage      |
+| `isDocument(value)`                       | Type guard for documents            |
+| `dimensionsMatch(a, b)`                   | Check embedding dimensions match    |
 
 ---
 
@@ -85,45 +150,81 @@ const [instance] = create[Main]({
 ### Basic Usage
 
 ```ts
-import { create[Main] } from '@mikesaintsg/[package-name]'
+import { createVectorStore } from '@mikesaintsg/vectorstore'
+import { createOpenAIEmbeddingAdapter } from '@mikesaintsg/adapters'
 
-const [instance] = create[Main]({
-	[option]: [value],
+const embedding = createOpenAIEmbeddingAdapter({
+  apiKey: process.env.OPENAI_API_KEY,
+  model: 'text-embedding-3-small',
 })
 
-// [Example description]
-[instance].[method]()
+const store = await createVectorStore(embedding)
+
+await store.upsertDocument({
+  id: 'doc-1',
+  content: 'TypeScript is a typed superset of JavaScript.',
+  metadata: { category: 'programming' },
+})
+
+const results = await store.similaritySearch('What is TypeScript?', {
+  limit: 5,
+})
 ```
 
-### With TypeScript
+### With Persistence
 
 ```ts
-import { create[Main] } from '@mikesaintsg/[package-name]'
+import { createVectorStore } from '@mikesaintsg/vectorstore'
+import {
+  createOpenAIEmbeddingAdapter,
+  createIndexedDBVectorPersistenceAdapter,
+} from '@mikesaintsg/adapters'
+import { createDatabase } from '@mikesaintsg/indexeddb'
 
-interface [TypeName] {
-	[property]: [type]
-}
+const embedding = createOpenAIEmbeddingAdapter({ apiKey })
+const db = await createDatabase('my-app')
+const persistence = createIndexedDBVectorPersistenceAdapter({ database: db })
 
-const [instance] = create[Main]<[TypeName]>({
-	[option]: { [property]: [value] },
+// Required adapter first, persistence is opt-in
+const store = await createVectorStore(embedding, {
+  persistence,
+  autoSave: true,
 })
 
-// Full type inference
-const result = [instance].[method]()
+// Load existing data
+await store.load()
+
+// Add documents (automatically persisted)
+await store.upsertDocument({ id: 'doc1', content: 'New content here.' })
+```
+
+### Hybrid Search
+
+```ts
+// Combine vector similarity with keyword matching
+const results = await store.hybridSearch('JavaScript runtime', {
+  limit: 10,
+  vectorWeight: 0.7,
+  keywordWeight: 0.3,
+})
 ```
 
 ### Error Handling
 
 ```ts
-import { create[Main], [Package]Error } from '@mikesaintsg/[package-name]'
+import { createVectorStore, VectorStoreError, isVectorStoreError } from '@mikesaintsg/vectorstore'
 
 try {
-	const [instance] = create[Main]({ [option]: [value] })
-	await [instance].[method]()
+  await store.load()
 } catch (error) {
-	if (error instanceof [Package]Error) {
-		console.error(`[${error.code}]: ${error.message}`)
-	}
+  if (isVectorStoreError(error)) {
+    console.error(`[${error.code}]: ${error.message}`)
+    
+    if (error.code === 'MODEL_MISMATCH') {
+      // Handle model mismatch - reindex or force load
+      await store.reindex()
+    }
+  }
 }
 ```
 
@@ -131,12 +232,16 @@ try {
 
 ## Ecosystem Integration
 
-| Package                          | Integration                |
-|----------------------------------|----------------------------|
-| `@mikesaintsg/core`              | Shared types and utilities |
-| `@mikesaintsg/[related-package]` | [Integration description]  |
+| Package                      | Integration                                |
+|------------------------------|--------------------------------------------|
+| `@mikesaintsg/core`          | Shared types (Embedding, ScoredResult)     |
+| `@mikesaintsg/adapters`      | Embedding and persistence adapters         |
+| `@mikesaintsg/inference`     | LLM generation for RAG applications        |
+| `@mikesaintsg/contextbuilder`| Context assembly with retrieval results    |
+| `@mikesaintsg/indexeddb`     | IndexedDB persistence                      |
+| `@mikesaintsg/filesystem`    | OPFS persistence for large vector sets     |
 
-See [Integration with Ecosystem](./guides/[package-name].md#integration-with-ecosystem) for details.
+See [Integration with Ecosystem](./guides/vectorstore.md#integration-with-ecosystem) for details.
 
 ---
 
@@ -144,10 +249,10 @@ See [Integration with Ecosystem](./guides/[package-name].md#integration-with-eco
 
 | Browser | Minimum Version |
 |---------|-----------------|
-| Chrome  | [version]+      |
-| Firefox | [version]+      |
-| Safari  | [version]+      |
-| Edge    | [version]+      |
+| Chrome  | 89+             |
+| Firefox | 89+             |
+| Safari  | 15+             |
+| Edge    | 89+             |
 
 ---
 
@@ -160,32 +265,3 @@ Contributions are welcome! Please read the [contributing guidelines](CONTRIBUTIN
 ## License
 
 MIT © [mikesaintsg](https://github.com/mikesaintsg)
-
----
-
-<!-- 
-Template Usage Notes (delete this section when using):
-
-1. Replace all [bracketed placeholders] with actual content
-2. Update badge URLs with correct package name
-3. Add or remove Features as needed
-4. Ensure Quick Start example is minimal but complete
-5. Link to the correct guide file
-6. Update browser support based on actual requirements
-7. Keep consistent with GUIDE.md template structure
-
-Required Sections:
-- Features (bulleted list)
-- Installation
-- Quick Start
-- Documentation (link to full guide)
-- API Overview (summary table)
-- Examples (2-3 key examples)
-- License
-
-Optional Sections:
-- Ecosystem Integration
-- Browser Support
-- Contributing
-- Changelog
--->
