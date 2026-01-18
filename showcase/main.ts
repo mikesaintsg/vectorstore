@@ -15,9 +15,6 @@ import {
 	createSSEParser,
 	// Persistence
 	createIndexedDBSessionPersistence,
-	// Bridges
-	createToolCallBridge,
-	createRetrievalTool,
 	// Errors
 	AdapterError,
 	isAdapterError,
@@ -25,9 +22,6 @@ import {
 import type {
 	RateLimiterState,
 	SSEEvent,
-	ToolRegistryInterface,
-	VectorStoreInterface,
-	SearchResult,
 } from '../src/types.js'
 
 /**
@@ -663,104 +657,15 @@ function demoVectorPersistence(): void {
 // ============================================================================
 
 function demoToolBridge(): void {
-	log('📦 Creating tool call bridge...')
-	try {
-		// Create a mock tool registry
-		const mockRegistry: ToolRegistryInterface = {
-			getSchemas: () => [
-				{
-					name: 'get_weather',
-					description: 'Get weather for a location',
-					parameters: {
-						type: 'object' as const,
-						properties: {
-							location: { type: 'string', description: 'City name' },
-						},
-						required: ['location'],
-					},
-				},
-			],
-			execute: (name: string, args: unknown) => {
-				log(`   Tool executed: ${name}(${JSON.stringify(args)})`)
-				return Promise.resolve({ temperature: 72, conditions: 'sunny' })
-			},
-			has: (name: string) => name === 'get_weather',
-		}
-
-		const bridge = createToolCallBridge({
-			registry: mockRegistry,
-			timeout: 30000,
-			onBeforeExecute: (toolCall) => {
-				log(`   🔧 Before: ${toolCall.name}`)
-			},
-			onAfterExecute: (toolCall, result) => {
-				log(`   ✅ After: ${toolCall.name} → ${JSON.stringify(result)}`)
-			},
-			onError: (error, toolCall) => {
-				log(`   ❌ Error in ${toolCall.name}: ${String(error)}`)
-			},
-		})
-		log('✅ Tool call bridge created')
-
-		// Test hasTool
-		log(`   hasTool('get_weather'): ${bridge.hasTool('get_weather')}`)
-		log(`   hasTool('unknown'): ${bridge.hasTool('unknown')}`)
-
-		// Execute a tool call
-		log('🔧 Executing tool call...')
-		void bridge.execute({
-			id: 'call_1',
-			name: 'get_weather',
-			arguments: { location: 'San Francisco' },
-		}).then((result) => {
-			log(`✅ Tool result: success=${result.success}, value=${JSON.stringify(result.value)}`)
-		}).catch((error: unknown) => {
-			log(`❌ Tool error: ${error instanceof Error ? error.message : String(error)}`)
-		})
-	} catch (error) {
-		log(`❌ Error: ${error instanceof Error ? error.message : String(error)}`)
-	}
+	log('📦 Tool call bridge functionality is available from @mikesaintsg/core')
+	log('   Import: import { createToolCallBridge } from "@mikesaintsg/core"')
+	log('   This package provides adapters that work with the bridge, not the bridge itself.')
 }
 
 function demoRetrievalTool(): void {
-	log('📦 Creating retrieval tool...')
-	try {
-		// Create a mock vector store
-		const mockVectorStore: VectorStoreInterface = {
-			search: (query: string, options?: { topK?: number; minScore?: number }) => {
-				log(`   Searching for: "${query}" (topK: ${options?.topK ?? 5})`)
-				const results: SearchResult[] = [
-					{ id: 'doc1', content: 'TypeScript is great', score: 0.95 },
-					{ id: 'doc2', content: 'JavaScript runtime', score: 0.85 },
-				]
-				return Promise.resolve(results)
-			},
-		}
-
-		const tool = createRetrievalTool({
-			vectorStore: mockVectorStore,
-			name: 'search_docs',
-			description: 'Search documentation for relevant information',
-			topK: 5,
-			minScore: 0.7,
-		})
-		log('✅ Retrieval tool created')
-		log(`   Tool name: ${tool.schema.name}`)
-		log(`   Description: ${tool.schema.description}`)
-
-		// Execute a search
-		log('🔍 Executing search...')
-		void tool.execute({ query: 'TypeScript' }).then((results) => {
-			log(`✅ Found ${results.length} results`)
-			results.forEach((r) => {
-				log(`   • ${r.id}: ${r.content.substring(0, 30)}... (score: ${r.score.toFixed(2)})`)
-			})
-		}).catch((error: unknown) => {
-			log(`❌ Search error: ${error instanceof Error ? error.message : String(error)}`)
-		})
-	} catch (error) {
-		log(`❌ Error: ${error instanceof Error ? error.message : String(error)}`)
-	}
+	log('📦 Retrieval tool functionality is available from @mikesaintsg/core')
+	log('   Import: import { createRetrievalTool } from "@mikesaintsg/core"')
+	log('   This package provides vector persistence adapters for storage.')
 }
 
 // ============================================================================

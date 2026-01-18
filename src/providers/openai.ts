@@ -5,14 +5,17 @@
  * Implements ProviderAdapterInterface for OpenAI chat completions.
  */
 
-import type { ProviderCapabilities, ToolCall, ToolSchema, Unsubscribe } from '@mikesaintsg/core'
 import type {
 	GenerationOptions,
 	GenerationResult,
 	Message,
 	ProviderAdapterInterface,
+	ProviderCapabilities,
 	StreamHandleInterface,
-} from '@mikesaintsg/inference'
+	ToolCall,
+	ToolSchema,
+	Unsubscribe,
+} from '@mikesaintsg/core'
 import type {
 	OpenAIChatCompletionChunk,
 	OpenAIProviderAdapterOptions,

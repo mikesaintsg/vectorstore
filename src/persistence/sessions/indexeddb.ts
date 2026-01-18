@@ -6,15 +6,21 @@
  */
 
 import type { PersistedSession, SessionSummary } from '@mikesaintsg/inference'
-import type {
-	SessionPersistenceAdapterInterface,
-	IndexedDBSessionPersistenceOptions,
-} from '../../types.js'
+import type { IndexedDBSessionPersistenceOptions } from '../../types.js'
 import {
 	INDEXEDDB_DEFAULT_SESSION_DATABASE,
 	INDEXEDDB_DEFAULT_SESSION_STORE,
 	INDEXEDDB_DEFAULT_SESSION_TTL_MS,
 } from '../../constants.js'
+
+/** Session persistence adapter interface for this package */
+interface SessionPersistenceAdapterInterface {
+	save(session: PersistedSession): Promise<void>
+	load(id: string): Promise<PersistedSession | undefined>
+	remove(id: string): Promise<void>
+	all(): Promise<readonly SessionSummary[]>
+	clear(): Promise<void>
+}
 
 /** Stored session with expiration tracking */
 interface StoredSession {

@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createOllamaProviderAdapter } from '@mikesaintsg/adapters'
-import type { Message } from '@mikesaintsg/inference'
+import type { Message } from '@mikesaintsg/core'
 
 describe('Ollama Provider Adapter', () => {
 	beforeEach(() => {

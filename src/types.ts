@@ -32,6 +32,7 @@ import type {
 	GenerationDefaults,
 	VectorStorePersistenceAdapterInterface,
 	MinimalDatabaseAccess,
+	MinimalDirectoryAccess,
 	// Policy adapter interfaces
 	RetryAdapterInterface,
 	RateLimitAdapterInterface,
@@ -45,6 +46,7 @@ import type {
 	TruncationAdapterInterface,
 	PriorityAdapterInterface,
 	DeduplicationStrategy,
+	FramePriority,
 	// Bridge interfaces
 	ToolCallBridgeInterface,
 	ToolCallBridgeOptions,
@@ -144,6 +146,42 @@ export interface AnthropicEmbeddingAdapterOptions {
 	readonly baseURL?: string
 }
 
+/**
+ * Batched embedding adapter options.
+ * Wraps an embedding adapter with automatic batching.
+ */
+export interface BatchedEmbeddingAdapterOptions {
+	/** The base embedding adapter to wrap */
+	readonly adapter: EmbeddingAdapterInterface
+	/** Maximum batch size (default: 100) */
+	readonly batchSize?: number
+	/** Delay before flushing batch in ms (default: 50) */
+	readonly delayMs?: number
+	/** Deduplicate identical texts within a batch (default: true) */
+	readonly deduplicate?: boolean
+}
+
+/**
+ * Cached embedding adapter options.
+ * Wraps an embedding adapter with caching support.
+ */
+export interface CachedEmbeddingAdapterOptions {
+	/** The base embedding adapter to wrap */
+	readonly adapter: EmbeddingAdapterInterface
+	/** Cache storage */
+	readonly cache: Map<string, CachedEmbedding>
+	/** Time-to-live in ms (optional) */
+	readonly ttlMs?: number
+}
+
+/** Cached embedding entry */
+export interface CachedEmbedding {
+	/** The embedding vector */
+	readonly embedding: Embedding
+	/** Timestamp when cached */
+	readonly cachedAt: number
+}
+
 // ============================================================================
 // Ollama Adapter Options (Local Development / Testing)
 // ============================================================================
@@ -210,6 +248,21 @@ export type OllamaChatModel =
 	| (string & {})
 
 // ============================================================================
+// Wrapper Adapter Options
+// ============================================================================
+
+/**
+ * Retryable provider adapter options.
+ * Used to wrap a base provider with retry logic.
+ */
+export interface RetryableProviderAdapterOptions {
+	/** The base provider adapter to wrap */
+	readonly adapter: ProviderAdapterInterface
+	/** Retry options */
+	readonly retry?: RetryOptions
+}
+
+// ============================================================================
 // Policy Adapter Options
 // ============================================================================
 
@@ -249,13 +302,63 @@ export interface LinearRetryAdapterOptions {
 	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
 }
 
-/** Default retryable error codes */
-export const DEFAULT_RETRYABLE_CODES: readonly AdapterErrorCode[] = [
-	'RATE_LIMIT_ERROR',
-	'NETWORK_ERROR',
-	'TIMEOUT_ERROR',
-	'SERVICE_ERROR',
-]
+/**
+ * Retry options for wrapper functions like withRetry().
+ * Used by retry wrapper utilities.
+ */
+export interface RetryOptions {
+	/** Maximum number of retry attempts (default: 3) */
+	readonly maxRetries?: number
+	/** Initial delay in ms (default: 1000) */
+	readonly initialDelayMs?: number
+	/** Maximum delay in ms (default: 30000) */
+	readonly maxDelayMs?: number
+	/** Exponential backoff multiplier (default: 2) */
+	readonly backoffMultiplier?: number
+	/** Add jitter to delays (default: true) */
+	readonly jitter?: boolean
+	/** Error codes that should trigger retry */
+	readonly retryableCodes?: readonly AdapterErrorCode[]
+	/** Custom function to determine if error is retryable */
+	readonly shouldRetry?: (error: unknown, attempt: number) => boolean
+	/** Called before each retry attempt */
+	readonly onRetry?: (error: unknown, attempt: number, delayMs: number) => void
+}
+
+// ============================================================================
+// Rate Limiter Types (Helper for Provider Adapters)
+// ============================================================================
+
+/**
+ * Rate limiter interface for internal use by provider adapters.
+ * This is a simpler interface than RateLimitAdapterInterface from core.
+ */
+export interface RateLimiterInterface {
+	/** Acquire a request slot, waits if none available */
+	acquire(): Promise<void>
+	/** Release a request slot */
+	release(): void
+	/** Get current rate limiter state */
+	getState(): RateLimiterState
+	/** Dynamically adjust rate limit */
+	setLimit(requestsPerMinute: number): void
+}
+
+/** Rate limiter state */
+export interface RateLimiterState {
+	readonly activeRequests: number
+	readonly maxConcurrent: number
+	readonly requestsInWindow: number
+	readonly requestsPerMinute: number
+	readonly windowResetIn: number
+}
+
+/** Rate limiter options */
+export interface RateLimiterOptions {
+	readonly requestsPerMinute?: number
+	readonly maxConcurrent?: number
+	readonly windowMs?: number
+}
 
 /**
  * Token bucket rate limit adapter options.
@@ -386,20 +489,6 @@ export interface ModelTokenMultipliers {
 	readonly [model: string]: number
 }
 
-/** Default model multipliers (chars per token) */
-export const DEFAULT_MODEL_MULTIPLIERS: Partial<ModelTokenMultipliers> = {
-	'gpt-4': 4,
-	'gpt-4o': 4,
-	'gpt-3.5-turbo': 4,
-	'claude-3-5-sonnet-20241022': 3.5,
-	'claude-3-opus-20240229': 3.5,
-	'claude-3-sonnet-20240229': 3.5,
-	'claude-3-haiku-20240307': 3.5,
-	'llama2': 4,
-	'llama3': 4,
-	'mistral': 4,
-}
-
 // ============================================================================
 // Tool Format Adapter Options
 // ============================================================================
@@ -449,8 +538,8 @@ export interface IndexedDBSessionPersistenceOptions {
 
 /** IndexedDB vector persistence options */
 export interface IndexedDBVectorPersistenceOptions {
-	/** Database name */
-	readonly databaseName: string
+	/** Database access interface */
+	readonly database: MinimalDatabaseAccess
 	/** Documents store name (default: 'documents') */
 	readonly documentsStore?: string
 	/** Metadata store name (default: 'metadata') */
@@ -459,9 +548,9 @@ export interface IndexedDBVectorPersistenceOptions {
 
 /** OPFS vector persistence options */
 export interface OPFSVectorPersistenceOptions {
-	/** Directory name in OPFS */
-	readonly directoryName: string
-	/** Chunk size for large files (default: 1MB) */
+	/** Directory access interface */
+	readonly directory: MinimalDirectoryAccess
+	/** Chunk size for large files (default: 100) */
 	readonly chunkSize?: number
 }
 
@@ -653,8 +742,6 @@ export type CreateEuclideanSimilarityAdapter = () => SimilarityAdapterInterface
 export interface DeduplicationAdapterOptions {
 	/** Strategy for selecting which frame to keep */
 	readonly strategy?: DeduplicationStrategy
-	/** Whether to preserve pinned frames */
-	readonly preservePinned?: boolean
 }
 
 /** Factory for deduplication adapter */
@@ -666,8 +753,6 @@ export type CreateDeduplicationAdapter = (
 export interface TruncationAdapterOptions {
 	/** Whether to preserve system frames */
 	readonly preserveSystem?: boolean
-	/** Whether to preserve pinned frames */
-	readonly preservePinned?: boolean
 }
 
 /** Factory for priority-based truncation adapter */
@@ -691,7 +776,7 @@ export type CreateScoreTruncationAdapter = (
 ) => TruncationAdapterInterface
 
 /** Priority weights configuration */
-export type PriorityWeights = Readonly<Record<string, number>>
+export type PriorityWeights = Partial<Record<FramePriority, number>>
 
 /** Priority adapter options */
 export interface PriorityAdapterOptions {
@@ -740,6 +825,41 @@ export interface OpenAIToolCallDelta {
 		readonly name?: string
 		readonly arguments?: string
 	}
+}
+
+/** OpenAI embedding response */
+export interface OpenAIEmbeddingResponse {
+	readonly object: 'list'
+	readonly data: readonly OpenAIEmbeddingData[]
+	readonly model: string
+	readonly usage: {
+		readonly prompt_tokens: number
+		readonly total_tokens: number
+	}
+}
+
+/** OpenAI embedding data */
+export interface OpenAIEmbeddingData {
+	readonly object: 'embedding'
+	readonly embedding: readonly number[]
+	readonly index: number
+}
+
+/** Voyage embedding response */
+export interface VoyageEmbeddingResponse {
+	readonly object: 'list'
+	readonly data: readonly VoyageEmbeddingData[]
+	readonly model: string
+	readonly usage: {
+		readonly total_tokens: number
+	}
+}
+
+/** Voyage embedding data */
+export interface VoyageEmbeddingData {
+	readonly object: 'embedding'
+	readonly embedding: readonly number[]
+	readonly index: number
 }
 
 /** Anthropic message stream event */

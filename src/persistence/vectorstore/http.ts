@@ -11,12 +11,12 @@ import {
 	deserializeStoredDocument,
 } from '../../helpers.js'
 import { HTTP_DEFAULT_TIMEOUT } from '../../constants.js'
-import {
-	HTTPPersistenceOptions,
+import type {
 	StoredDocument,
 	VectorStoreMetadata,
 	VectorStorePersistenceAdapterInterface,
 } from '@mikesaintsg/core'
+import type { HTTPVectorPersistenceOptions } from '../../types.js'
 
 /**
  * Create an HTTP persistence adapter for VectorStore.
@@ -35,7 +35,7 @@ import {
  * ```
  */
 export function createHTTPVectorStorePersistence(
-	options: HTTPPersistenceOptions,
+	options: HTTPVectorPersistenceOptions,
 ): VectorStorePersistenceAdapterInterface {
 	const {
 		baseURL,

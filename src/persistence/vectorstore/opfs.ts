@@ -14,11 +14,12 @@ import {
 	OPFS_METADATA_FILE,
 	OPFS_DOCUMENTS_PREFIX,
 } from '../../constants.js'
-import {
-	OPFSVectorStorePersistenceOptions,
-	StoredDocument, VectorStoreMetadata,
+import type {
+	StoredDocument,
+	VectorStoreMetadata,
 	VectorStorePersistenceAdapterInterface,
 } from '@mikesaintsg/core'
+import type { OPFSVectorPersistenceOptions } from '../../types.js'
 
 /**
  * Create an OPFS persistence adapter for VectorStore.
@@ -40,7 +41,7 @@ import {
  * ```
  */
 export function createOPFSVectorStorePersistence(
-	options: OPFSVectorStorePersistenceOptions,
+	options: OPFSVectorPersistenceOptions,
 ): VectorStorePersistenceAdapterInterface {
 	const {
 		directory,
