@@ -1,8 +1,8 @@
 {
-	"name": "@mikesaintsg/adapters",
+	"name": "@mikesaintsg/vectorstore",
 	"version": "0.0.1",
 	"type": "module",
-	"description": "Type-safe adapters with full TypeScript support. Zero runtime dependencies.",
+	"description": "Type-safe vectorstore with full TypeScript support. Zero runtime dependencies.",
 	"keywords": [
 		"typescript",
 		"browser",
@@ -12,13 +12,13 @@
 	],
 	"author": "Mike Garcia",
 	"license": "MIT",
-	"homepage": "https://github.com/mikesaintsg/adapters#readme",
+	"homepage": "https://github.com/mikesaintsg/vectorstore#readme",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/mikesaintsg/adapters.git"
+		"url": "https://github.com/mikesaintsg/vectorstore.git"
 	},
 	"bugs": {
-		"url": "https://github.com/mikesaintsg/adapters/issues"
+		"url": "https://github.com/mikesaintsg/vectorstore/issues"
 	},
 	"engines": {
 		"node": ">=18.0.0"
