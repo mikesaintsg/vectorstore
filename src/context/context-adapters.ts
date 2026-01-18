@@ -253,7 +253,7 @@ export function createPriorityAdapter(
 ): PriorityAdapterInterface {
 	const weights: Readonly<Record<FramePriority, number>> = {
 		...DEFAULT_PRIORITY_WEIGHTS,
-		...(options?.weights as Partial<Record<FramePriority, number>>),
+		...options?.weights,
 	}
 
 	return {

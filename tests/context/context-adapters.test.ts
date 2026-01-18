@@ -217,7 +217,7 @@ describe('Context Builder Adapters', () => {
 
 		it('creates adapter with custom weights', () => {
 			const priority = createPriorityAdapter({
-				weights: { critical: 5000 } as Record<string, number>,
+				weights: { critical: 5000 },
 			})
 
 			expect(priority.getWeight('critical')).toBe(5000)

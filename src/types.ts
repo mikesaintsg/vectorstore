@@ -46,6 +46,7 @@ import type {
 	TruncationAdapterInterface,
 	PriorityAdapterInterface,
 	DeduplicationStrategy,
+	FramePriority,
 	// Bridge interfaces
 	ToolCallBridgeInterface,
 	ToolCallBridgeOptions,
@@ -775,7 +776,7 @@ export type CreateScoreTruncationAdapter = (
 ) => TruncationAdapterInterface
 
 /** Priority weights configuration */
-export type PriorityWeights = Readonly<Record<string, number>>
+export type PriorityWeights = Partial<Record<FramePriority, number>>
 
 /** Priority adapter options */
 export interface PriorityAdapterOptions {
