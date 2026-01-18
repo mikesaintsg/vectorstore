@@ -10,11 +10,12 @@ import {
 	INDEXEDDB_DEFAULT_METADATA_STORE,
 	VECTORSTORE_METADATA_KEY,
 } from '../../constants.js'
-import {
-	IndexedDBVectorStorePersistenceOptions,
-	StoredDocument, VectorStoreMetadata,
+import type {
+	StoredDocument,
+	VectorStoreMetadata,
 	VectorStorePersistenceAdapterInterface,
 } from '@mikesaintsg/core'
+import type { IndexedDBVectorPersistenceOptions } from '../../types.js'
 
 /**
  * Create an IndexedDB persistence adapter for VectorStore.
@@ -36,7 +37,7 @@ import {
  * ```
  */
 export function createIndexedDBVectorStorePersistence(
-	options: IndexedDBVectorStorePersistenceOptions,
+	options: IndexedDBVectorPersistenceOptions,
 ): VectorStorePersistenceAdapterInterface {
 	const {
 		database,

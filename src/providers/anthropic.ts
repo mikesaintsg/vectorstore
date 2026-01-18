@@ -5,14 +5,17 @@
  * Implements ProviderAdapterInterface for Anthropic Claude models.
  */
 
-import type { ProviderCapabilities, ToolCall, ToolSchema, Unsubscribe } from '@mikesaintsg/core'
 import type {
 	GenerationOptions,
 	GenerationResult,
 	Message,
 	ProviderAdapterInterface,
+	ProviderCapabilities,
 	StreamHandleInterface,
-} from '@mikesaintsg/inference'
+	ToolCall,
+	ToolSchema,
+	Unsubscribe,
+} from '@mikesaintsg/core'
 import type { AnthropicProviderAdapterOptions } from '../types.js'
 import { ANTHROPIC_DEFAULT_CHAT_MODEL, ANTHROPIC_API_BASE_URL, ANTHROPIC_API_VERSION } from '../constants.js'
 import { createSSEParser } from '../helpers/sse.js'

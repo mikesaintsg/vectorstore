@@ -5,14 +5,15 @@
  * Wraps a provider adapter with retry logic for transient failures.
  */
 
-import type { ProviderCapabilities, Unsubscribe } from '@mikesaintsg/core'
 import type {
 	GenerationOptions,
 	GenerationResult,
 	Message,
 	ProviderAdapterInterface,
+	ProviderCapabilities,
 	StreamHandleInterface,
-} from '@mikesaintsg/inference'
+	Unsubscribe,
+} from '@mikesaintsg/core'
 import type { RetryableProviderAdapterOptions, RetryOptions } from '../types.js'
 import { isAdapterError } from '../errors.js'
 import { DEFAULT_RETRYABLE_CODES } from '../constants.js'
